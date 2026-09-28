@@ -41,6 +41,7 @@ Sub BuildGuideSheet()
     Dim y As Double
     y = 24
 
+    ' ================= BANNER (FULL WIDTH) =================
     Dim bannerShp As Excel.Shape
     Set bannerShp = ws.Shapes.AddShape(msoShapeRectangle, MARGIN, y, DESIGN_WIDTH - MARGIN * 2, 56)
     bannerShp.Fill.ForeColor.RGB = navy
@@ -52,7 +53,7 @@ Sub BuildGuideSheet()
 
     Dim backBtn As Excel.Shape
     Set backBtn = ws.Shapes.AddShape(msoShapeRoundedRectangle, DESIGN_WIDTH - MARGIN - 110, y + 13, 90, 30)
-    backBtn.Adjustments.Item(1) = 0.3
+    backBtn.Adjustments.item(1) = 0.3
     backBtn.Fill.ForeColor.RGB = RGB(255, 255, 255)
     backBtn.Line.Visible = msoFalse
     backBtn.OnAction = "Guide_GoToHome"
@@ -61,7 +62,7 @@ Sub BuildGuideSheet()
         .TextRange.Text = ChrW(8249) & " Home"
         .TextRange.Font.Name = "Calibri"
         .TextRange.Font.Size = 9
-        .TextRange.Font.Bold = msoTrue
+        .TextRange.Font.bold = msoTrue
         .TextRange.Font.Fill.ForeColor.RGB = navy
         .VerticalAnchor = msoAnchorMiddle
         .HorizontalAnchor = msoAnchorCenter
@@ -72,6 +73,7 @@ Sub BuildGuideSheet()
     Dim topOfColumns As Double
     topOfColumns = y
 
+    ' ================= LEFT COLUMN HEADER =================
     Guide_AddText ws, leftColX, y, colWidth, 20, "HOW TO USE THE APPLICATION", 12.5, True, navy, "Calibri", msoAlignLeft
     Dim leftHeaderDiv As Excel.Shape
     Set leftHeaderDiv = ws.Shapes.AddLine(leftColX, y + 22, leftColX + colWidth, y + 22)
@@ -79,6 +81,7 @@ Sub BuildGuideSheet()
     leftHeaderDiv.Line.Weight = 2
     leftHeaderDiv.Locked = True
 
+    ' ================= RIGHT COLUMN HEADER =================
     Guide_AddText ws, rightColX, y, colWidth, 20, "SYSTEM REQUIREMENTS AND SETUP", 12.5, True, navy, "Calibri", msoAlignLeft
     Dim rightHeaderDiv As Excel.Shape
     Set rightHeaderDiv = ws.Shapes.AddLine(rightColX, y + 22, rightColX + colWidth, y + 22)
@@ -92,7 +95,9 @@ Sub BuildGuideSheet()
     leftY = y
     rightY = y
 
-    ' LEFT COLUMN - HOW TO USE
+    ' ============================================================
+    ' LEFT COLUMN CONTENT - HOW TO USE
+    ' ============================================================
     Guide_AddSectionHeader ws, "GETTING STARTED", "Steps before your first report.", leftColX, leftColX + colWidth, leftY, titleClr, descClr, borderClr, accentClr
     leftY = leftY + 34
     Guide_AddStep ws, 1, "Set Key Date and Filters", "Open Maintenance, click Report Data and Filters, and confirm your SAP key date.", leftColX, leftColX + colWidth, leftY, navy, titleClr, descClr
@@ -125,7 +130,9 @@ Sub BuildGuideSheet()
     Guide_AddRow ws, "Delete All Sheets", "Removes generated tabs after exporting. Keeps Factoring Report history.", leftColX, leftColX + colWidth, leftY, titleClr, descClr, borderClr
     Guide_AddRow ws, "Reset Tracker", "Full reset. Clears reports, history, and tabs to start a new cycle.", leftColX, leftColX + colWidth, leftY, titleClr, descClr, borderClr
 
-    ' RIGHT COLUMN - SETUP AND REQUIREMENTS
+    ' ============================================================
+    ' RIGHT COLUMN CONTENT - SETUP AND REQUIREMENTS
+    ' ============================================================
     Guide_AddSectionHeader ws, "OVERVIEW", "A fully self-contained workbook.", rightColX, rightColX + colWidth, rightY, titleClr, descClr, borderClr, accentClr
     rightY = rightY + 30
     Guide_AddPlainDesc ws, "No installation, no server, no network dependency. Each colleague can download and run their own local copy independently.", rightColX, rightColX + colWidth, rightY, descClr
@@ -167,6 +174,7 @@ Sub BuildGuideSheet()
     Guide_AddPlainDesc ws, "For any issues not resolved above, please contact the AR Factoring Risk Automation owner.", rightColX, rightColX + colWidth, rightY, descClr
     rightY = rightY + 30
 
+    ' ================= VERTICAL DIVIDER BETWEEN COLUMNS =================
     Dim maxY As Double
     maxY = leftY
     If rightY > maxY Then maxY = rightY
@@ -177,6 +185,7 @@ Sub BuildGuideSheet()
     vDivider.Line.Weight = 1
     vDivider.Locked = True
 
+    ' ================= FOOTER (FULL WIDTH) =================
     Dim footY As Double
     footY = maxY + 14
 
@@ -191,6 +200,7 @@ Sub BuildGuideSheet()
 
     footY = footY + 50
 
+    ' ================= BACKGROUND, SIZED TO FINAL CONTENT =================
     Dim bgShape As Excel.Shape
     Set bgShape = ws.Shapes.AddShape(msoShapeRectangle, 0, 0, DESIGN_WIDTH, footY)
     bgShape.Fill.ForeColor.RGB = lightBg
@@ -198,10 +208,11 @@ Sub BuildGuideSheet()
     bgShape.Locked = True
     bgShape.ZOrder msoSendToBack
 
+    ' ================= CENTER + LOCK + PROTECT =================
     Dim offsetX As Double
     offsetX = 0
     On Error Resume Next
-    offsetX = (ActiveWindow.UsableWidth - DESIGN_WIDTH) / 2
+    offsetX = (ActiveWindow.usableWidth - DESIGN_WIDTH) / 2
     On Error GoTo 0
     If offsetX < 0 Then offsetX = 0
     If offsetX > 2 Then
@@ -220,7 +231,7 @@ Sub BuildGuideSheet()
     Next shpLock
 
     ws.Columns("A:Z").ColumnWidth = 9
-    ws.Rows.RowHeight = 15
+    ws.Rows.rowHeight = 15
 
     ws.EnableSelection = xlNoSelection
     ws.Protect Password:="VB_AR_2026", DrawingObjects:=True, Contents:=True, Scenarios:=True, UserInterfaceOnly:=True
@@ -259,7 +270,7 @@ Sub Guide_AddStep(ws As Worksheet, num As Long, stepTitle As String, stepDesc As
         With .TextFrame2
             .TextRange.Text = CStr(num)
             .TextRange.Font.Size = 9
-            .TextRange.Font.Bold = msoTrue
+            .TextRange.Font.bold = msoTrue
             .TextRange.Font.Fill.ForeColor.RGB = RGB(255, 255, 255)
             .VerticalAnchor = msoAnchorMiddle
             .HorizontalAnchor = msoAnchorCenter
@@ -275,7 +286,7 @@ Sub Guide_AddStep(ws As Worksheet, num As Long, stepTitle As String, stepDesc As
             .TextRange.Text = stepTitle
             .TextRange.Font.Name = "Calibri"
             .TextRange.Font.Size = 9.5
-            .TextRange.Font.Bold = msoTrue
+            .TextRange.Font.bold = msoTrue
             .TextRange.Font.Fill.ForeColor.RGB = titleClr
             .TextRange.ParagraphFormat.Alignment = msoAlignLeft
             .VerticalAnchor = msoAnchorMiddle
@@ -314,7 +325,7 @@ Sub Guide_AddRow(ws As Worksheet, rowTitle As String, rowDesc As String, leftPos
             .TextRange.Text = rowTitle
             .TextRange.Font.Name = "Calibri"
             .TextRange.Font.Size = 8.5
-            .TextRange.Font.Bold = msoTrue
+            .TextRange.Font.bold = msoTrue
             .TextRange.Font.Fill.ForeColor.RGB = titleClr
             .TextRange.ParagraphFormat.Alignment = msoAlignLeft
         End With
@@ -371,12 +382,11 @@ Sub Guide_AddText(ws As Worksheet, l As Double, t As Double, w As Double, h As D
         .TextRange.Text = txt
         .TextRange.Font.Name = fontName
         .TextRange.Font.Size = sz
-        .TextRange.Font.Bold = bold
+        .TextRange.Font.bold = bold
         .TextRange.Font.Fill.ForeColor.RGB = clr
         .TextRange.ParagraphFormat.Alignment = align
     End With
 End Sub
-
 Sub Guide_GoToHome()
     On Error Resume Next
     ThisWorkbook.Sheets("Home").Activate
