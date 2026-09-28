@@ -1,4 +1,4 @@
-```vba
+Attribute VB_Name = "Module1"
 Option Explicit
 
 '============================================================
@@ -211,6 +211,7 @@ End Function
 ' OPTION 1 - FACTORING REPORT (> 4,999 EUR)
 '============================================================
 Sub GenerateSummaryReport()
+If Not ConfirmKeyDateUpdated() Then Exit Sub
     Dim wsSrcOriginal As Worksheet, wsSrc As Worksheet, wsRep As Worksheet, wsArch As Worksheet
     Dim wsFactor As Worksheet, wsAtradius As Worksheet
     Dim lastRow As Long, i As Long, r As Long, blockStart As Long, headerRow As Long
@@ -531,6 +532,7 @@ End Sub
 ' OPTION 2 - DETAILED CC TABS EXPORT (> 4,999 EUR)
 '============================================================
 Sub GenerateCompanyCodeTabs()
+If Not ConfirmKeyDateUpdated() Then Exit Sub
     Dim wsSrcOriginal As Worksheet, wsSrc As Worksheet, wsNew As Worksheet
     Dim wsFactor As Worksheet, wsAtradius As Worksheet, wsArch As Worksheet
     Dim lastRow As Long, i As Long, r As Long
@@ -1617,6 +1619,7 @@ End Function
 ' FULL AGING REPORT - ONE TAB PER COMPANY CODE, ALL BUCKETS, NO THRESHOLD, NO KPI
 '============================================================
 Sub GenerateFullAgingTabs()
+If Not ConfirmKeyDateUpdated() Then Exit Sub
     Dim wsSrcOriginal As Worksheet, wsSrc As Worksheet
     Dim lastRow As Long, i As Long
     Dim uniqueCC As New Collection
@@ -1832,6 +1835,7 @@ End Sub
 ' GENERATE SINGLE REPORT - PICK ONE COMPANY CODE, FULL AGING STYLE
 '============================================================
 Sub GenerateSingleReport()
+If Not ConfirmKeyDateUpdated() Then Exit Sub
     Dim wsSrcOriginal As Worksheet, wsSrc As Worksheet
     Dim lastRow As Long, i As Long
     Dim uniqueCC As New Collection
@@ -2219,6 +2223,7 @@ End Sub
 ' FULL AGING REPORT - DIRECT TO FILES, NO TABS LEFT IN WORKBOOK
 '============================================================
 Sub GenerateFullAgingReportFiles()
+If Not ConfirmKeyDateUpdated() Then Exit Sub
     Dim wsSrcOriginal As Worksheet, wsSrc As Worksheet
     Dim lastRow As Long, i As Long
     Dim uniqueCC As New Collection
@@ -2343,16 +2348,21 @@ Sub GenerateFullAgingReportFiles()
         savedCount = savedCount + 1
     Next cc
 
-    Unload frmProg
+        Unload frmProg
     Application.ScreenUpdating = True
 
     Application.DisplayAlerts = False
     wsSrc.Delete
     Application.DisplayAlerts = True
 
+    ThisWorkbook.Activate
+    On Error Resume Next
+    ThisWorkbook.Sheets("Home").Activate
+    On Error GoTo 0
+
     MsgBox savedCount & " Full Aging report(s) saved successfully to:" & vbNewLine & folderPath, vbInformation, "Full Aging Reports Complete"
     Exit Sub
-
+    
 CleanFail:
     On Error Resume Next
     Unload frmProg
@@ -2370,6 +2380,7 @@ End Sub
 ' SINGLE FULL AGING REPORT - DIRECT SAVE AS, NO TAB LEFT IN WORKBOOK
 '============================================================
 Sub GenerateSingleReportToFile()
+If Not ConfirmKeyDateUpdated() Then Exit Sub
     Dim wsSrcOriginal As Worksheet, wsSrc As Worksheet
     Dim lastRow As Long, i As Long
     Dim uniqueCC As New Collection
@@ -2387,7 +2398,13 @@ Sub GenerateSingleReportToFile()
 
     Set wsSrc = CreateTempSourceCopy(wsSrcOriginal)
 
+    On Error Resume Next
+    ThisWorkbook.Sheets("Home").Activate
+    On Error GoTo 0
+
     Dim lastRowA As Long, lastRowC As Long
+    
+
     lastRowA = wsSrc.Cells(wsSrc.Rows.Count, "A").End(xlUp).Row
     lastRowC = wsSrc.Cells(wsSrc.Rows.Count, "C").End(xlUp).Row
     lastRow = Application.WorksheetFunction.Max(lastRowA, lastRowC)
@@ -2460,12 +2477,17 @@ savePath = Application.GetSaveAsFilename(InitialFileName:=defaultName, FileFilte
         Exit Sub
     End If
 
-    newWB.SaveAs savePath
+        newWB.SaveAs savePath
     newWB.Close SaveChanges:=False
+
+    ThisWorkbook.Activate
+    On Error Resume Next
+    ThisWorkbook.Sheets("Home").Activate
+    On Error GoTo 0
 
     MsgBox "Report for " & selectedCC & " saved successfully.", vbInformation, "Report Complete"
     Exit Sub
-
+    
 CleanFail:
     Application.DisplayAlerts = False
     On Error Resume Next
@@ -2473,3 +2495,18 @@ CleanFail:
     Application.DisplayAlerts = True
     MsgBox "An error occurred: " & Err.Description, vbCritical, "Process Error"
 End Sub
+
+'============================================================
+' CONFIRMATION PROMPT - REMINDS USER TO UPDATE KEY DATE BEFORE GENERATING
+' Returns True if user confirms, False if they cancel
+'============================================================
+Function ConfirmKeyDateUpdated() As Boolean
+    Dim response As VbMsgBoxResult
+    response = MsgBox("Before generating this report, please confirm:" & vbNewLine & vbNewLine & _
+                       "Have you updated the Key Due Date in the 'Report Data & Filters' tab (Analysis tool)?" & vbNewLine & vbNewLine & _
+                       "If not, click 'No' and update it first via the Settings panel on Home.", _
+                       vbYesNo + vbQuestion, "Confirm Key Date")
+
+    ConfirmKeyDateUpdated = (response = vbYes)
+End Function
+
