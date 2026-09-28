@@ -1,14 +1,23 @@
+```vba
 Option Explicit
 
 '============================================================
-' MAIN ENTRY - BUILD THE HOME / CONTROL PANEL SHEET
+' MAIN ENTRY - BUILD THE COMPACT DASHBOARD-STYLE HOME SCREEN
 '============================================================
 Sub BuildHomeSheet()
     Dim ws As Worksheet
-    Dim leftMargin As Double, colWidth As Double, colGap As Double
-    Dim col1Left As Double, col2Left As Double, gridRight As Double
-    Dim dividerX As Double, rightLeft As Double, rightWidth As Double
-    Dim cardLeft As Double, cardTop As Double, cardWidth As Double, cardHeight As Double
+    
+        ' --- Temporarily unhide IconLibrary so icon copying works reliably ---
+    Dim wsIconLib As Worksheet
+    Dim iconLibOriginalVisibility As XlSheetVisibility
+    On Error Resume Next
+    Set wsIconLib = ThisWorkbook.Sheets("IconLibrary")
+    On Error GoTo 0
+    If Not wsIconLib Is Nothing Then
+        iconLibOriginalVisibility = wsIconLib.Visible
+        wsIconLib.Visible = xlSheetVisible
+    End If
+    
 
     Application.DisplayAlerts = False
     On Error Resume Next
@@ -19,372 +28,448 @@ Sub BuildHomeSheet()
     Set ws = ThisWorkbook.Sheets.Add(Before:=ThisWorkbook.Sheets(1))
     ws.Name = "Home"
     ws.Tab.Color = RGB(30, 58, 95)
-    ws.Visible = xlSheetVisible
 
     Application.ScreenUpdating = False
     ws.Activate
     ActiveWindow.DisplayGridlines = False
     ActiveWindow.DisplayHeadings = False
 
-    leftMargin = 20
-    colWidth = 220
-    colGap = 16
-    col1Left = leftMargin
-    col2Left = col1Left + colWidth + colGap
-    gridRight = col2Left + colWidth
+    ' ---- Tightened design constants ----
+    Const DESIGN_WIDTH As Double = 880
+    Const HEADER_HEIGHT As Double = 68
+    Const LOGO_PANEL_WIDTH As Double = 128
+    Const MARGIN As Double = 24
 
-    dividerX = gridRight + 25
-    rightLeft = dividerX + 20
-    rightWidth = 180
+    Dim navy As Long, darkNavy As Long, lightBg As Long, cardBg As Long
+    Dim borderClr As Long, iconBoxClr As Long, iconClr As Long, titleClr As Long, descClr As Long
+    navy = RGB(34, 63, 97)
+    darkNavy = RGB(15, 28, 45)
+    lightBg = RGB(241, 245, 249)
+    cardBg = RGB(255, 255, 255)
+    borderClr = RGB(226, 232, 240)
+    iconBoxClr = RGB(222, 232, 245)
+    iconClr = RGB(34, 63, 97)
+    titleClr = RGB(20, 35, 55)
+    descClr = RGB(100, 110, 125)
 
-    cardLeft = leftMargin - 15
-    cardTop = 15
-    cardWidth = (rightLeft + rightWidth + 15) - cardLeft
-    cardHeight = 460
 
-    Dim cardShape As Shape
-    Set cardShape = ws.Shapes.AddShape(msoShapeRectangle, cardLeft, cardTop, cardWidth, cardHeight)
-    With cardShape
-        .Fill.ForeColor.RGB = RGB(247, 248, 250)
-        .Line.ForeColor.RGB = RGB(220, 223, 227)
-        .Line.Weight = 1
-        .Shadow.Type = msoShadow21
+    ' ==================== HEADER BAR ====================
+    AddHeaderBar ws, DESIGN_WIDTH, HEADER_HEIGHT, LOGO_PANEL_WIDTH, darkNavy, navy
+
+    ' ==================== SECTION: REPORTS ====================
+    Dim sectionTop As Double
+    sectionTop = HEADER_HEIGHT + 16
+
+    AddSectionHeader ws, "bars", "REPORTS", "Generate reports, analyze risk, and manage company codes. - all in one place", _
+        MARGIN, DESIGN_WIDTH - MARGIN, sectionTop, titleClr, descClr, borderClr
+
+    Dim contentWidth As Double, colGap As Double, colWidth As Double
+    contentWidth = DESIGN_WIDTH - (MARGIN * 2)
+    colGap = 10
+    colWidth = (contentWidth - colGap * 2) / 3
+
+    Dim cardsReports() As Variant
+    cardsReports = Array( _
+        Array("bars", "Factoring Risk Report", "Factoring report. Risk above 4,999 EUR.", "GenerateSummaryReport"), _
+        Array("building", "Company Code Risk Report", "One tab per company code. Risk above 4,999 EUR.", "GenerateCompanyCodeTabs"), _
+        Array("document", "Full Aging Report", "Generates each company code as a separate file, no tabs created.", "GenerateFullAgingReportFiles"), _
+        Array("document", "Full Aging Single Report", "Pick one company code, save directly as a file.", "GenerateSingleReportToFile"), _
+        Array("export", "Export a Single Report", "Pick one report and save it as a standalone file.", "ExportGeneratedReport"), _
+        Array("export", "Export All Reports", "Save every generated report into a folder.", "ExportAllGeneratedReports") _
+    )
+
+    Dim gridBottom As Double
+    gridBottom = DrawCardGrid(ws, cardsReports, MARGIN, sectionTop + 32, colWidth, 64, colGap, 8, 3, _
+        cardBg, borderClr, iconBoxClr, iconClr, titleClr, descClr)
+
+        ' ==================== SECTION: MAINTENANCE ====================
+    sectionTop = gridBottom + 18
+
+    AddSectionHeader ws, "wrench", "MAINTENANCE", "Update reference lists and manage application data.", _
+        MARGIN, DESIGN_WIDTH - MARGIN, sectionTop, titleClr, descClr, borderClr
+
+    Dim cardsMaint() As Variant
+    cardsMaint = Array( _
+        Array("database", "Report Data & Filters", "Manage report data and CC filters.", "OpenSAPPrompts"), _
+        Array("people", "Partners List", "View and manage factoring and Atradius partners.", "JumpToPartnerLists"), _
+        Array("grid", "Hide Partners List", "Hides both partner sheets once saved.", "RehideReferenceSheets") _
+    )
+
+    gridBottom = DrawCardGrid(ws, cardsMaint, MARGIN, sectionTop + 32, colWidth, 64, colGap, 8, 3, _
+        cardBg, borderClr, iconBoxClr, iconClr, titleClr, descClr)
+
+    ' ==================== SECTION: ADMIN PANEL ====================
+    sectionTop = gridBottom + 18
+
+    AddSectionHeader ws, "gear", "ADMIN PANEL", "Customize and manage the application.", _
+        MARGIN, DESIGN_WIDTH - MARGIN, sectionTop, titleClr, descClr, borderClr
+
+    Dim cardsAdmin() As Variant
+    cardsAdmin = Array( _
+        Array("trash", "Delete All Sheets", "Removes generated reports to keep file clean.", "DeleteAllSheetsExceptFactoring"), _
+        Array("refresh", "Reset Tracker", "Clean reports, history, and tabs.", "ResetTracker"), _
+        Array("monitor", "Build Home Screen", "Set a new Home screen if it gets stuck.", "BuildHomeSheet") _
+    )
+
+    gridBottom = DrawCardGrid(ws, cardsAdmin, MARGIN, sectionTop + 32, colWidth, 64, colGap, 8, 3, _
+        cardBg, borderClr, iconBoxClr, iconClr, titleClr, descClr)
+
+    ' ==================== FOOTER ====================
+    AddFooter ws, MARGIN, DESIGN_WIDTH - MARGIN, gridBottom + 14, borderClr, descClr, navy
+    
+        ' ---- Full background panel - sized to actual final content height ----
+    Dim finalHeight As Double
+    finalHeight = gridBottom + 14 + 40   ' footer height + a bit of bottom breathing room
+
+    Dim bgShape As Shape
+    Set bgShape = ws.Shapes.AddShape(msoShapeRectangle, 0, 0, DESIGN_WIDTH, finalHeight)
+    With bgShape
+        .Fill.ForeColor.RGB = lightBg
+        .Line.Visible = msoFalse
+        .Locked = True
         .ZOrder msoSendToBack
     End With
 
-    Dim bannerShape As Shape
-    Set bannerShape = ws.Shapes.AddShape(msoShapeRectangle, leftMargin, 30, gridRight - leftMargin, 46)
-    With bannerShape
-        .Fill.ForeColor.RGB = RGB(31, 78, 121)
-        .Line.Visible = msoFalse
-        With .TextFrame2
-            .TextRange.Text = "VILLEROY & BOCH" & vbNewLine & "AR RISK & AGING CENTER"
-            .TextRange.Font.Name = "Calibri"
-            .TextRange.Font.Size = 13
-            .TextRange.Font.Bold = msoTrue
-            .TextRange.Font.Fill.ForeColor.RGB = RGB(255, 255, 255)
-            .VerticalAnchor = msoAnchorMiddle
-            .HorizontalAnchor = msoAnchorCenter
-            .TextRange.ParagraphFormat.Alignment = msoAlignCenter
-        End With
-    End With
+    ' ---- Center the whole layout horizontally within the visible window ----
+    Dim offsetX As Double
+    offsetX = 0
+    On Error Resume Next
+    offsetX = (ActiveWindow.usableWidth - DESIGN_WIDTH) / 2
+    On Error GoTo 0
+    If offsetX < 0 Then offsetX = 0
 
-    Dim subtitleShape As Shape
-    Set subtitleShape = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, leftMargin, 80, gridRight - leftMargin, 18)
-    With subtitleShape
-        .Fill.Visible = msoFalse
-        .Line.Visible = msoFalse
-        With .TextFrame2
-            .TextRange.Text = "Select an action below to get started"
-            .TextRange.Font.Name = "Calibri"
-            .TextRange.Font.Size = 9
-            .TextRange.Font.Italic = msoTrue
-            .TextRange.Font.Fill.ForeColor.RGB = RGB(110, 110, 110)
-            .HorizontalAnchor = msoAnchorCenter
-            .TextRange.ParagraphFormat.Alignment = msoAlignCenter
-        End With
-    End With
+    If offsetX > 2 Then
+        Dim shp As Shape
+        For Each shp In ws.Shapes
+            shp.Left = shp.Left + offsetX
+        Next shp
+    End If
 
-    Dim hDivider As Shape
-    Set hDivider = ws.Shapes.AddLine(leftMargin + 20, 102, gridRight - 20, 102)
-    hDivider.Line.ForeColor.RGB = RGB(220, 223, 227)
-    hDivider.Line.Weight = 1
-
-    Dim vDivider As Shape
-    Set vDivider = ws.Shapes.AddLine(dividerX, 30, dividerX, cardTop + cardHeight - 20)
-    vDivider.Line.ForeColor.RGB = RGB(220, 223, 227)
-    vDivider.Line.Weight = 1
-
-    Dim btnWidth As Double, btnHeight As Double, rowTop As Double, rowStep As Double
-    btnWidth = colWidth
-    btnHeight = 36
-    rowStep = btnHeight + 2 + 20 + 14
-    rowTop = 118
-
-    AddHomeButton ws, "Factoring Risk Report", "Factoring report. Risk above 4,999 EUR.", "GenerateSummaryReport", col1Left, colWidth, btnWidth, btnHeight, rowTop, RGB(31, 78, 121)
-    AddHomeButton ws, "Company Code Risk Report", "One tab per company code. Risk above 4,999 EUR.", "GenerateCompanyCodeTabs", col2Left, colWidth, btnWidth, btnHeight, rowTop, RGB(39, 92, 44)
-    rowTop = rowTop + rowStep
-
-    AddHomeButton ws, "Full Aging Report", "Generates each company code as a separate file, no tabs created.", "GenerateFullAgingReportFiles", col1Left, colWidth, btnWidth, btnHeight, rowTop, RGB(120, 80, 30)
-    AddHomeButton ws, "Full Aging Single Report", "Pick one company code, save directly as a file.", "GenerateSingleReportToFile", col2Left, colWidth, btnWidth, btnHeight, rowTop, RGB(70, 130, 140)
-    rowTop = rowTop + rowStep
-
-    AddHomeButton ws, "Export All Reports", "Saves every generated report into a folder.", "ExportAllGeneratedReports", col1Left, colWidth, btnWidth, btnHeight, rowTop, RGB(90, 60, 150)
-    AddHomeButton ws, "Export a Single Report", "Pick one report and save it as a standalone file.", "ExportGeneratedReport", col2Left, colWidth, btnWidth, btnHeight, rowTop, RGB(158, 118, 20)
-    rowTop = rowTop + rowStep
-
-    Dim footerShape As Shape
-    Set footerShape = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, leftMargin, rowTop + 8, gridRight - leftMargin, 16)
-    With footerShape
-        .Fill.Visible = msoFalse
-        .Line.Visible = msoFalse
-        With .TextFrame2
-            .TextRange.Text = "Villeroy & Boch  |  Accounts Receivable  |  AR Factoring Risk Automation"
-            .TextRange.Font.Name = "Calibri"
-            .TextRange.Font.Size = 8
-            .TextRange.Font.Fill.ForeColor.RGB = RGB(150, 150, 150)
-            .HorizontalAnchor = msoAnchorCenter
-            .TextRange.ParagraphFormat.Alignment = msoAlignCenter
-        End With
-    End With
-
-    Dim settingsHeader As Shape
-    Set settingsHeader = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, rightLeft, 30, rightWidth, 18)
-    With settingsHeader
-        .Fill.Visible = msoFalse
-        .Line.Visible = msoFalse
-        With .TextFrame2
-            .TextRange.Text = "SETTINGS"
-            .TextRange.Font.Name = "Calibri"
-            .TextRange.Font.Size = 10
-            .TextRange.Font.Bold = msoTrue
-            .TextRange.Font.Fill.ForeColor.RGB = RGB(70, 75, 82)
-            .HorizontalAnchor = msoAnchorCenter
-            .TextRange.ParagraphFormat.Alignment = msoAlignCenter
-        End With
-    End With
-
-    Dim settingsSub As Shape
-    Set settingsSub = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, rightLeft, 48, rightWidth, 16)
-    With settingsSub
-        .Fill.Visible = msoFalse
-        .Line.Visible = msoFalse
-        With .TextFrame2
-            .TextRange.Text = "Update reference lists"
-            .TextRange.Font.Name = "Calibri"
-            .TextRange.Font.Size = 8
-            .TextRange.Font.Italic = msoTrue
-            .TextRange.Font.Fill.ForeColor.RGB = RGB(120, 120, 120)
-            .HorizontalAnchor = msoAnchorCenter
-            .TextRange.ParagraphFormat.Alignment = msoAlignCenter
-        End With
-    End With
-
-    Dim sBtnWidth As Double, sBtnHeight As Double, sBlockGap As Double, sBtnTop As Double
-    sBtnWidth = rightWidth - 20
-    sBtnHeight = 25
-    sBlockGap = 8
-    sBtnTop = 70
-
-    AddSmallButton ws, "Prompts for Workbook", "OpenSAPPrompts", rightLeft, rightWidth, sBtnWidth, sBtnHeight, sBtnTop, RGB(212, 137, 26)
-    sBtnTop = sBtnTop + sBtnHeight + sBlockGap
-
-    AddSmallButton ws, "Partners List", "JumpToPartnerLists", rightLeft, rightWidth, sBtnWidth, sBtnHeight, sBtnTop, RGB(13, 71, 161)
-    sBtnTop = sBtnTop + sBtnHeight + sBlockGap
-
-    AddSmallButton ws, "Hide Reference Sheets", "RehideReferenceSheets", rightLeft, rightWidth, sBtnWidth, sBtnHeight, sBtnTop, RGB(100, 100, 100)
-    sBtnTop = sBtnTop + sBtnHeight + sBlockGap
-
-    Dim adminDivider As Shape
-    Set adminDivider = ws.Shapes.AddLine(rightLeft + 10, sBtnTop + 6, rightLeft + rightWidth - 10, sBtnTop + 6)
-    adminDivider.Line.ForeColor.RGB = RGB(220, 223, 227)
-    adminDivider.Line.Weight = 1
-
-    Dim adminTop As Double
-    adminTop = sBtnTop + 16
-
-    Dim adminHeader As Shape
-    Set adminHeader = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, rightLeft, adminTop, rightWidth, 18)
-    With adminHeader
-        .Fill.Visible = msoFalse
-        .Line.Visible = msoFalse
-        With .TextFrame2
-            .TextRange.Text = "ADMIN PANEL"
-            .TextRange.Font.Name = "Calibri"
-            .TextRange.Font.Size = 10
-            .TextRange.Font.Bold = msoTrue
-            .TextRange.Font.Fill.ForeColor.RGB = RGB(70, 75, 82)
-            .HorizontalAnchor = msoAnchorCenter
-            .TextRange.ParagraphFormat.Alignment = msoAlignCenter
-        End With
-    End With
-
-    Dim aBtnTop As Double, aBtnHeight As Double, aBlockGap As Double
-    aBtnTop = adminTop + 22
-    aBtnHeight = 27
-    aBlockGap = 16
-
-    AddHomeButton ws, "Build Home Screen", "If the Home screen looks stuck or overlapped", "BuildHomeSheet", rightLeft, rightWidth, rightWidth - 20, aBtnHeight, aBtnTop, RGB(70, 75, 82)
-    aBtnTop = aBtnTop + aBtnHeight + aBlockGap + 10
-
-    AddHomeButton ws, "Delete All Sheets", "Removes temporary tabs, keeps Factoring", "DeleteAllSheetsExceptFactoring", rightLeft, rightWidth, rightWidth - 20, aBtnHeight, aBtnTop, RGB(120, 40, 40)
-    aBtnTop = aBtnTop + aBtnHeight + aBlockGap + 10
-
-    AddHomeButton ws, "Reset Tracker", "Clears all reports and history to start fresh", "ResetTracker", rightLeft, rightWidth, rightWidth - 20, aBtnHeight, aBtnTop, RGB(150, 40, 40)
-
+    ' ---- Lock everything and protect ----
     LockAllShapesFreeFloating ws
 
     ws.Columns("A:Z").ColumnWidth = 9
-    ws.Rows.RowHeight = 15
+    ws.Rows.rowHeight = 15
+
+    Application.DisplayFormulaBar = False
+    ActiveWindow.DisplayGridlines = False
+    ActiveWindow.DisplayHeadings = False
 
     ws.EnableSelection = xlNoSelection
-    ws.Protect Password:="VB_AR_2026", DrawingObjects:=True, Contents:=True, Scenarios:=True, UserInterfaceOnly:=True
+    ws.Protect Password:="VB_AR_2026", _
+               DrawingObjects:=True, _
+               Contents:=True, _
+               Scenarios:=True, _
+               UserInterfaceOnly:=True
 
     Application.ScreenUpdating = True
     EnsureTabOrder
+    
+        ' --- Restore IconLibrary's original visibility ---
+    If Not wsIconLib Is Nothing Then
+        wsIconLib.Visible = iconLibOriginalVisibility
+    End If
 
-    MsgBox "Home screen rebuilt successfully!", vbInformation, "Setup Complete"
+    Application.ScreenUpdating = True
+    EnsureTabOrder
+    Application.CutCopyMode = False
+
+    MsgBox "Home screen rebuilt with real icons and logo!", vbInformation, "Setup Complete"
 End Sub
 
-'============================================================
-' HELPER - ADD A CENTERED BUTTON + DESCRIPTIVE CAPTION BELOW IT
-'============================================================
-Sub AddHomeButton(ws As Worksheet, caption As String, helperText As String, macroName As String, leftMargin As Double, contentWidth As Double, btnWidth As Double, btnHeight As Double, topPos As Double, fillColor As Long)
+Sub ListHomeIconSizes()
+    Dim ws As Worksheet
     Dim shp As Shape
-    Dim btnLeft As Double
-    btnLeft = leftMargin + (contentWidth - btnWidth) / 2
-
-    Set shp = ws.Shapes.AddShape(msoShapeRoundedRectangle, btnLeft, topPos, btnWidth, btnHeight)
-    With shp
-        .Name = "btnHome_" & macroName
-        .OnAction = macroName
-        .Fill.ForeColor.RGB = fillColor
-        .Line.Visible = msoFalse
-        .Shadow.Type = msoShadow21
-        With .TextFrame2
-            .TextRange.Characters.Text = caption
-            .TextRange.Characters.Font.Name = "Calibri"
-            .TextRange.Characters.Font.Size = 10
-            .TextRange.Characters.Font.Bold = True
-            .TextRange.Characters.Font.Fill.ForeColor.RGB = RGB(255, 255, 255)
-            .VerticalAnchor = msoAnchorMiddle
-            .HorizontalAnchor = msoAnchorCenter
-            .TextRange.ParagraphFormat.Alignment = msoAlignCenter
-        End With
-    End With
-
-    Dim helperShape As Shape
-    Set helperShape = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, leftMargin, topPos + btnHeight + 1, contentWidth, 20)
-    With helperShape
-        .Fill.Visible = msoFalse
-        .Line.Visible = msoFalse
-        With .TextFrame2
-            .TextRange.Text = helperText
-            .TextRange.Font.Name = "Calibri"
-            .TextRange.Font.Size = 7.5
-            .TextRange.Font.Bold = msoTrue
-            .TextRange.Font.Fill.ForeColor.RGB = RGB(130, 130, 130)
-            .HorizontalAnchor = msoAnchorCenter
-            .TextRange.ParagraphFormat.Alignment = msoAlignCenter
-            .WordWrap = msoTrue
-        End With
-    End With
-End Sub
-
-'============================================================
-' HELPER - ADD A COMPACT BUTTON FOR SETTINGS/ADMIN
-'============================================================
-Sub AddSmallButton(ws As Worksheet, caption As String, macroName As String, boxLeft As Double, boxWidth As Double, btnWidth As Double, btnHeight As Double, topPos As Double, fillColor As Long)
-    Dim shp As Shape
-    Dim btnLeft As Double
-    btnLeft = boxLeft + (boxWidth - btnWidth) / 2
-
-    Set shp = ws.Shapes.AddShape(msoShapeRoundedRectangle, btnLeft, topPos, btnWidth, btnHeight)
-    With shp
-        .Name = "btnSettings_" & macroName
-        .OnAction = macroName
-        .Fill.ForeColor.RGB = fillColor
-        .Line.Visible = msoFalse
-        .Shadow.Type = msoShadow21
-        With .TextFrame2
-            .TextRange.Characters.Text = caption
-            .TextRange.Characters.Font.Name = "Calibri"
-            .TextRange.Characters.Font.Size = 8.5
-            .TextRange.Characters.Font.Bold = True
-            .TextRange.Characters.Font.Fill.ForeColor.RGB = RGB(255, 255, 255)
-            .VerticalAnchor = msoAnchorMiddle
-            .HorizontalAnchor = msoAnchorCenter
-            .TextRange.ParagraphFormat.Alignment = msoAlignCenter
-        End With
-    End With
-End Sub
-
-'============================================================
-' OPEN SAP ANALYSIS PROMPTS FOR WORKBOOK
-'============================================================
-Sub OpenSAPPrompts()
-    Dim lResult As Variant
-    Dim errOccurred As Boolean
-    errOccurred = False
+    Dim msg As String
 
     On Error Resume Next
-    lResult = Application.Run("SAPExecuteCommand", "Refresh", "ALL")
-    If Err.Number <> 0 Then errOccurred = True
-
-    lResult = Application.Run("SAPExecuteCommand", "ShowPrompts", "ALL")
-    If Err.Number <> 0 Then errOccurred = True
+    Set ws = ThisWorkbook.Sheets("Home")
     On Error GoTo 0
+    If ws Is Nothing Then
+        MsgBox "Home sheet not found!", vbCritical
+        Exit Sub
+    End If
 
-    If errOccurred Then
-        MsgBox "Could not communicate with the SAP Analysis Add-In." & vbNewLine & vbNewLine & _
-               "Please check that:" & vbNewLine & _
-               "1. The 'Analysis' ribbon tab is enabled in Excel." & vbNewLine & _
-               "2. Your SAP network / VPN is connected.", _
-               vbExclamation, "SAP Analysis"
+    Dim i As Long
+    i = 0
+    For Each shp In ws.Shapes
+        If shp.Type = msoPicture Then
+            i = i + 1
+            msg = msg & i & ". Name:[" & shp.Name & "]  W:" & Round(shp.Width, 1) & _
+                  "  H:" & Round(shp.Height, 1) & "  Left:" & Round(shp.Left, 0) & _
+                  "  Top:" & Round(shp.Top, 0) & vbNewLine
+        End If
+    Next shp
+
+    If msg = "" Then
+        MsgBox "No picture shapes found on Home at all!", vbExclamation
+    Else
+        MsgBox "Picture shapes on Home (" & i & " total):" & vbNewLine & vbNewLine & msg, vbInformation
     End If
 End Sub
 
+
 '============================================================
-' ROBUST COPY - WITH RETRY LOGIC TO ELIMINATE CLIPBOARD RACE CONDITIONS
+' LETTER-SPACE HELPER - USES A THIN SPACE FOR ELEGANT TRACKING
 '============================================================
-Function CopyLibraryPicture(ws As Worksheet, shapeName As String) As Shape
-    Dim wsLib As Worksheet
-    Dim srcShp As Shape
-    Dim newPic As Object
-    Dim attempt As Long
-    Dim maxAttempts As Long
-    maxAttempts = 5
+Function LetterSpace(txt As String, Optional useThinSpace As Boolean = True) As String
+    Dim i As Long, result As String, spacer As String
+    If useThinSpace Then
+        spacer = ChrW(8201)
+    Else
+        spacer = " "
+    End If
+    For i = 1 To Len(txt)
+        result = result & Mid(txt, i, 1)
+        If i < Len(txt) Then result = result & spacer
+    Next i
+    LetterSpace = result
+End Function
+Sub AddHeaderBar(ws As Worksheet, totalWidth As Double, headerHeight As Double, logoWidth As Double, darkNavy As Long, navy As Long)
+    Dim logoBg As Long
+    logoBg = RGB(46, 84, 122)   ' Brighter navy for the logo panel background
 
-    On Error Resume Next
-    Set wsLib = ThisWorkbook.Sheets("IconLibrary")
-    On Error GoTo 0
-    If wsLib Is Nothing Then Exit Function
+    Dim logoPanel As Shape
+    Set logoPanel = ws.Shapes.AddShape(msoShapeRectangle, 0, 0, logoWidth, headerHeight)
+    logoPanel.Fill.ForeColor.RGB = logoBg
+    logoPanel.Line.Visible = msoFalse
+    logoPanel.Locked = True
 
-    On Error Resume Next
-    Set srcShp = wsLib.Shapes(shapeName)
-    On Error GoTo 0
-    If srcShp Is Nothing Then Exit Function
+    ' --- Real logo image, with breathing room top/bottom ---
+    Dim logoShp As Shape
+    Set logoShp = CopyLibraryPicture(ws, "logo_vb")
 
-    For attempt = 1 To maxAttempts
-        Application.CutCopyMode = False
-        DoEvents
-
-        srcShp.Copy
-
-        Dim waitStart As Double
-        waitStart = Timer
-        Do While Timer < waitStart + 0.05
-            DoEvents
-        Loop
-
-        On Error Resume Next
-        Set newPic = Nothing
-        Set newPic = ws.Pictures.Paste(Link:=False)
-        On Error GoTo 0
-
-        If Not newPic Is Nothing Then
-            If newPic.Width > 1 And newPic.Height > 1 Then
-                Exit For
+    If Not logoShp Is Nothing Then
+        With logoShp
+            .LockAspectRatio = msoTrue
+            Dim maxW As Double, maxH As Double
+            maxW = logoWidth - 16          ' side padding
+            maxH = headerHeight - 8       ' extra top/bottom padding for breathing room
+            If .Width / .Height > maxW / maxH Then
+                .Width = maxW
             Else
-                On Error Resume Next
-                newPic.Delete
-                On Error GoTo 0
-                Set newPic = Nothing
+                .Height = maxH
             End If
-        End If
+            .Left = (logoWidth - .Width) / 2
+            .Top = (headerHeight - .Height) / 2
+            .Locked = True
+        End With
+    Else
+        AddPlainText ws, 5, headerHeight / 2 - 16, logoWidth - 10, 14, "VILLEROY & BOCH", 7.5, True, RGB(255, 255, 255), "Georgia", msoAlignCenter
+        AddPlainText ws, 5, headerHeight / 2 + 1, logoWidth - 10, 11, LetterSpace("1748"), 5.5, False, RGB(220, 230, 240), "Calibri", msoAlignCenter
+    End If
 
-        DoEvents
-    Next attempt
+    Dim mainHeader As Shape
+    Set mainHeader = ws.Shapes.AddShape(msoShapeRectangle, logoWidth, 0, totalWidth - logoWidth, headerHeight)
+    mainHeader.Fill.ForeColor.RGB = navy
+    mainHeader.Line.Visible = msoFalse
+    mainHeader.Locked = True
 
-    Application.CutCopyMode = False
+AddPlainText ws, logoWidth + 8, headerHeight - 42, 300, 18, "RISK & AGING CENTER", 12.5, True, RGB(255, 255, 255), "Calibri", msoAlignLeft
+AddPlainText ws, logoWidth + 9, headerHeight - 22, 300, 12, LetterSpace("ACCOUNTS RECEIVABLE"), 6.5, False, RGB(180, 195, 215), "Calibri", msoAlignLeft
 
-    If newPic Is Nothing Then Exit Function
+    Dim navLeft As Double, navWidth As Double
+    navLeft = logoWidth + 310
+    navWidth = totalWidth - 116 - navLeft - 12
+    AddPlainText ws, navLeft, headerHeight / 2 - 6, navWidth, 14, _
+        LetterSpace("TRUST") & "   |   " & LetterSpace("ACCURACY") & "   |   " & LetterSpace("RESULTS"), _
+        7.5, False, RGB(195, 210, 225), "Calibri", msoAlignCenter
 
-    Set CopyLibraryPicture = ws.Shapes(newPic.Name)
+    Dim divLine As Shape
+    Set divLine = ws.Shapes.AddLine(totalWidth - 116, 14, totalWidth - 116, headerHeight - 14)
+    divLine.Line.ForeColor.RGB = RGB(90, 110, 135)
+    divLine.Line.Weight = 1
+    divLine.Locked = True
+
+    AddNamedText ws, totalWidth - 106, headerHeight / 2 - 24, 96, 12, Format(Now, "ddd, dd MMM yyyy"), 6.5, False, RGB(210, 220, 232), "Calibri", msoAlignLeft, "lblHeaderDate"
+    AddNamedText ws, totalWidth - 106, headerHeight / 2 - 10, 96, 18, Format(Now, "HH:mm"), 13, True, RGB(255, 255, 255), "Calibri", msoAlignLeft, "lblHeaderTime"
+    AddNamedText ws, totalWidth - 106, headerHeight / 2 + 11, 96, 12, GetGreeting() & ", " & GetFriendlyUserName(), 6.5, False, RGB(200, 212, 226), "Calibri", msoAlignLeft, "lblHeaderGreeting"
+End Sub
+
+'============================================================
+' REFRESH THE LIVE DATE/TIME/GREETING
+'============================================================
+Sub UpdateHeaderDateTime()
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Sheets("Home")
+    On Error GoTo 0
+    If ws Is Nothing Then Exit Sub
+
+    On Error Resume Next
+    ws.Shapes("lblHeaderDate").TextFrame2.TextRange.Text = Format(Now, "ddd, dd MMM yyyy")
+    ws.Shapes("lblHeaderTime").TextFrame2.TextRange.Text = Format(Now, "HH:mm")
+    ws.Shapes("lblHeaderGreeting").TextFrame2.TextRange.Text = GetGreeting() & ", " & GetFriendlyUserName()
+    On Error GoTo 0
+End Sub
+
+Function GetGreeting() As String
+    Dim h As Integer
+    h = Hour(Now)
+    If h < 12 Then
+        GetGreeting = "Good morning"
+    ElseIf h < 18 Then
+        GetGreeting = "Good afternoon"
+    Else
+        GetGreeting = "Good evening"
+    End If
+End Function
+
+Function GetFriendlyUserName() As String
+    Dim rawName As String
+    rawName = Application.UserName
+    If rawName = "" Then rawName = Environ("USERNAME")
+    rawName = Split(rawName, "_")(0)
+    rawName = Split(rawName, " ")(0)
+    If Len(rawName) > 0 Then
+        GetFriendlyUserName = UCase(Left(rawName, 1)) & LCase(Mid(rawName, 2))
+    Else
+        GetFriendlyUserName = "User"
+    End If
 End Function
 
 '============================================================
-' DRAW ICON - PULLS FROM IconLibrary VIA CopyLibraryPicture
+' SECTION HEADER
+'============================================================
+Sub AddSectionHeader(ws As Worksheet, iconType As String, labelText As String, descText As String, _
+                      leftPos As Double, rightPos As Double, topPos As Double, _
+                      titleClr As Long, descClr As Long, borderClr As Long)
+    DrawIcon ws, iconType, leftPos, topPos - 6, 28, titleClr, ""
+    AddPlainText ws, leftPos + 36, topPos, 260, 22, labelText, 14, True, titleClr, "Calibri", msoAlignLeft
+
+    Dim descShp As Shape
+    Set descShp = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, rightPos - 380, topPos + 3, 380, 18)
+    With descShp
+        .Fill.Visible = msoFalse
+        .Line.Visible = msoFalse
+        .Locked = True
+        With .TextFrame2
+            .TextRange.Text = descText
+            .TextRange.Font.Name = "Calibri"
+            .TextRange.Font.Size = 9
+            .TextRange.Font.Fill.ForeColor.RGB = RGB(90, 100, 115)
+            .TextRange.ParagraphFormat.Alignment = msoAlignRight
+        End With
+    End With
+
+    Dim divLine As Shape
+    Set divLine = ws.Shapes.AddLine(leftPos, topPos + 26, rightPos, topPos + 26)
+    divLine.Line.ForeColor.RGB = borderClr
+    divLine.Line.Weight = 1
+    divLine.Locked = True
+End Sub
+
+'============================================================
+' DRAW A GRID OF DASHBOARD CARDS - RETURNS THE BOTTOM Y POSITION
+'============================================================
+Function DrawCardGrid(ws As Worksheet, cards As Variant, leftPos As Double, topPos As Double, _
+                       colWidth As Double, rowHeight As Double, colGap As Double, rowGap As Double, cols As Long, _
+                       cardBg As Long, borderClr As Long, iconBoxClr As Long, iconClr As Long, titleClr As Long, descClr As Long) As Double
+    Dim i As Long, r As Long, c As Long
+    Dim curLeft As Double, curTop As Double
+
+    For i = LBound(cards) To UBound(cards)
+        r = i \ cols
+        c = i Mod cols
+        curLeft = leftPos + c * (colWidth + colGap)
+        curTop = topPos + r * (rowHeight + rowGap)
+
+        AddDashboardCard ws, curLeft, curTop, colWidth, rowHeight, _
+            CStr(cards(i)(0)), CStr(cards(i)(1)), CStr(cards(i)(2)), CStr(cards(i)(3)), _
+            cardBg, borderClr, iconBoxClr, iconClr, titleClr, descClr
+    Next i
+
+    Dim totalRows As Long
+    totalRows = ((UBound(cards) - LBound(cards)) \ cols) + 1
+    DrawCardGrid = topPos + totalRows * rowHeight + (totalRows - 1) * rowGap
+End Function
+
+'============================================================
+' ONE DASHBOARD CARD - TIGHT SPACING, FULLY CLICKABLE
+'============================================================
+Sub AddDashboardCard(ws As Worksheet, l As Double, t As Double, w As Double, h As Double, _
+                      ByVal iconType As String, ByVal titleText As String, ByVal descText As String, ByVal macroName As String, _
+                      cardBg As Long, borderClr As Long, iconBoxClr As Long, iconClr As Long, titleClr As Long, descClr As Long)
+    Dim cardShp As Shape
+    Set cardShp = ws.Shapes.AddShape(msoShapeRoundedRectangle, l, t, w, h)
+    With cardShp
+        .Adjustments.item(1) = 0.08
+        .Fill.ForeColor.RGB = cardBg
+        .Line.ForeColor.RGB = borderClr
+        .Line.Weight = 1
+        .Shadow.Type = msoShadow21
+        .OnAction = macroName
+        .Locked = True
+    End With
+
+        Dim boxSize As Double
+    boxSize = 34
+    Dim iconBox As Shape
+    Set iconBox = ws.Shapes.AddShape(msoShapeRoundedRectangle, l + 8, t + 8, boxSize, boxSize)
+    With iconBox
+        .Adjustments.item(1) = 0.28
+        .Fill.ForeColor.RGB = iconBoxClr
+        .Line.Visible = msoFalse
+        .OnAction = macroName
+        .Locked = True
+    End With
+
+    DrawIcon ws, iconType, l + 8, t + 8, boxSize, iconClr, macroName
+
+    Dim titleShp As Shape
+    Set titleShp = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, l + 50, t + 6, w - 68, 17)
+    With titleShp
+        .Fill.Visible = msoFalse
+        .Line.Visible = msoFalse
+        .OnAction = macroName
+        .Locked = True
+        With .TextFrame2
+            .TextRange.Text = titleText
+            .TextRange.Font.Name = "Calibri"
+            .TextRange.Font.Size = 10.5
+            .TextRange.Font.bold = msoTrue
+            .TextRange.Font.Fill.ForeColor.RGB = titleClr
+            .WordWrap = msoTrue
+        End With
+    End With
+    
+    Dim descShp As Shape
+    Set descShp = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, l + 50, t + 25, w - 58, 34)
+    With descShp
+        .Fill.Visible = msoFalse
+        .Line.Visible = msoFalse
+        .OnAction = macroName
+        .Locked = True
+        With .TextFrame2
+            .TextRange.Text = descText
+            .TextRange.Font.Name = "Calibri"
+            .TextRange.Font.Size = 7.5
+            .TextRange.Font.Fill.ForeColor.RGB = descClr
+            .WordWrap = msoTrue
+        End With
+    End With
+
+    Dim chevronShp As Shape
+    Set chevronShp = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, l + w - 15, t, 12, h)
+    With chevronShp
+        .Fill.Visible = msoFalse
+        .Line.Visible = msoFalse
+        .OnAction = macroName
+        .Locked = True
+        With .TextFrame2
+            .TextRange.Text = ChrW(8250)
+            .TextRange.Font.Name = "Calibri"
+            .TextRange.Font.Size = 10
+            .TextRange.Font.bold = msoTrue
+            .TextRange.Font.Fill.ForeColor.RGB = RGB(150, 160, 175)
+            .VerticalAnchor = msoAnchorMiddle
+            .HorizontalAnchor = msoAnchorCenter
+        End With
+    End With
+End Sub
+
+'============================================================
+' DRAW ICON - PULLS FROM IconLibrary USING THE ROBUST COPY METHOD
 '============================================================
 Sub DrawIcon(ws As Worksheet, iconType As String, boxLeft As Double, boxTop As Double, boxSize As Double, clr As Long, macroName As String)
     Dim newShp As Shape
@@ -408,9 +493,117 @@ Sub DrawIcon(ws As Worksheet, iconType As String, boxLeft As Double, boxTop As D
         .Locked = True
     End With
 End Sub
+'============================================================
+' GENERIC ICON PIECE
+'============================================================
+Sub AddIconShape(ws As Worksheet, shapeType As MsoAutoShapeType, x As Double, y As Double, w As Double, h As Double, _
+                  clr As Long, macroName As String, Optional outlineOnly As Boolean = False, _
+                  Optional outlineClr As Long = 0, Optional rotationDeg As Double = 0)
+    Dim shp As Shape
+    Set shp = ws.Shapes.AddShape(shapeType, x, y, w, h)
+    With shp
+        .Fill.ForeColor.RGB = clr
+        .Line.Visible = msoFalse
+        If rotationDeg <> 0 Then .Rotation = rotationDeg
+        If macroName <> "" Then .OnAction = macroName
+        .Locked = True
+    End With
+End Sub
 
 '============================================================
-' JUMP TO REFERENCE SHEETS
+' THIN HORIZONTAL LINE
+'============================================================
+Sub AddIconShapeThinLine(ws As Worksheet, x As Double, y As Double, w As Double, clr As Long, macroName As String)
+    Dim shp As Shape
+    Set shp = ws.Shapes.AddShape(msoShapeRectangle, x, y, w, 1.2)
+    shp.Fill.ForeColor.RGB = clr
+    shp.Line.Visible = msoFalse
+    If macroName <> "" Then shp.OnAction = macroName
+    shp.Locked = True
+End Sub
+
+'============================================================
+' THIN VERTICAL LINE
+'============================================================
+Sub AddIconShapeThinVLine(ws As Worksheet, x As Double, y As Double, h As Double, clr As Long, macroName As String)
+    Dim shp As Shape
+    Set shp = ws.Shapes.AddShape(msoShapeRectangle, x, y, 1.2, h)
+    shp.Fill.ForeColor.RGB = clr
+    shp.Line.Visible = msoFalse
+    If macroName <> "" Then shp.OnAction = macroName
+    shp.Locked = True
+End Sub
+
+'============================================================
+' FOOTER
+'============================================================
+Sub AddFooter(ws As Worksheet, leftPos As Double, rightPos As Double, topPos As Double, borderClr As Long, descClr As Long, navy As Long)
+    Dim divLine As Shape
+    Set divLine = ws.Shapes.AddLine(leftPos, topPos, rightPos, topPos)
+    divLine.Line.ForeColor.RGB = borderClr
+    divLine.Line.Weight = 1
+    divLine.Locked = True
+
+    AddPlainText ws, leftPos, topPos + 7, 420, 12, _
+        "Villeroy & Boch  |  Accounts Receivable  |  AR RISK & AGING CENTER v1.0", 7, False, RGB(60, 70, 85), "Calibri", msoAlignLeft
+    AddPlainText ws, leftPos, topPos + 19, 480, 12, _
+        "Internal use only for V&B AR operations.  (C) " & Year(Date) & " Villeroy & Boch. All rights reserved.", 6, False, descClr, "Calibri", msoAlignLeft
+
+    Dim tagDiv As Shape
+    Set tagDiv = ws.Shapes.AddLine(rightPos - 160, topPos + 7, rightPos - 160, topPos + 29)
+    tagDiv.Line.ForeColor.RGB = borderClr
+    tagDiv.Line.Weight = 1
+    tagDiv.Locked = True
+
+    AddPlainText ws, rightPos - 148, topPos + 7, 148, 12, LetterSpace("BETTER TOGETHER"), 7, True, navy, "Calibri", msoAlignRight
+    AddPlainText ws, rightPos - 148, topPos + 19, 148, 12, LetterSpace("FOR A BRIGHTER TOMORROW"), 6, False, descClr, "Calibri", msoAlignRight
+End Sub
+
+'============================================================
+' GENERIC HELPER - PLAIN LOCKED TEXTBOX
+'============================================================
+Sub AddPlainText(ws As Worksheet, l As Double, t As Double, w As Double, h As Double, _
+                  txt As String, sz As Double, bold As Boolean, clr As Long, fontName As String, align As Long)
+    Dim shp As Shape
+    Set shp = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, l, t, w, h)
+    With shp
+        .Fill.Visible = msoFalse
+        .Line.Visible = msoFalse
+        .Locked = True
+        With .TextFrame2
+            .TextRange.Text = txt
+            .TextRange.Font.Name = fontName
+            .TextRange.Font.Size = sz
+            .TextRange.Font.bold = bold
+            .TextRange.Font.Fill.ForeColor.RGB = clr
+            .TextRange.ParagraphFormat.Alignment = align
+        End With
+    End With
+End Sub
+
+Function AddNamedText(ws As Worksheet, l As Double, t As Double, w As Double, h As Double, _
+                       txt As String, sz As Double, bold As Boolean, clr As Long, fontName As String, align As Long, shpName As String) As Shape
+    Dim shp As Shape
+    Set shp = ws.Shapes.AddTextbox(msoTextOrientationHorizontal, l, t, w, h)
+    With shp
+        .Name = shpName
+        .Fill.Visible = msoFalse
+        .Line.Visible = msoFalse
+        .Locked = True
+        With .TextFrame2
+            .TextRange.Text = txt
+            .TextRange.Font.Name = fontName
+            .TextRange.Font.Size = sz
+            .TextRange.Font.bold = bold
+            .TextRange.Font.Fill.ForeColor.RGB = clr
+            .TextRange.ParagraphFormat.Alignment = align
+        End With
+    End With
+    Set AddNamedText = shp
+End Function
+
+'============================================================
+' JUMP TO REFERENCE SHEETS - MERGED BUTTON OPENS BOTH LISTS
 '============================================================
 Sub JumpToPartnerLists()
     JumpToReferenceSheet "AtradiusPartners"
@@ -475,69 +668,66 @@ Sub LockAllShapesFreeFloating(ws As Worksheet)
         On Error GoTo 0
     Next shp
 End Sub
-
 '============================================================
-' ONE-TIME SETUP - HIDE ICON LIBRARY
+' ROBUST COPY - WITH RETRY LOGIC TO ELIMINATE CLIPBOARD RACE CONDITIONS
 '============================================================
-Sub HideIconLibrary()
-    ThisWorkbook.Sheets("IconLibrary").Visible = xlSheetVeryHidden
-End Sub
-
-'============================================================
-' ONE-TIME SETUP - AUTO-NAME ICONS LEFT TO RIGHT
-' (Run once after pasting icon images onto IconLibrary sheet)
-'============================================================
-Sub NameIconLibraryShapesByPosition()
-    Dim ws As Worksheet
-    Dim shapesList() As Shape
-    Dim i As Long, j As Long, n As Long
+Function CopyLibraryPicture(ws As Worksheet, shapeName As String) As Shape
+    Dim wsLib As Worksheet
+    Dim srcShp As Shape
+    Dim newPic As Object
+    Dim attempt As Long
+    Dim maxAttempts As Long
+    maxAttempts = 5
 
     On Error Resume Next
-    Set ws = ThisWorkbook.Sheets("IconLibrary")
+    Set wsLib = ThisWorkbook.Sheets("IconLibrary")
     On Error GoTo 0
+    If wsLib Is Nothing Then Exit Function
 
-    If ws Is Nothing Then
-        MsgBox "Sheet 'IconLibrary' not found.", vbCritical
-        Exit Sub
-    End If
+    On Error Resume Next
+    Set srcShp = wsLib.Shapes(shapeName)
+    On Error GoTo 0
+    If srcShp Is Nothing Then Exit Function
 
-    n = ws.Shapes.Count
-    If n = 0 Then
-        MsgBox "No shapes found on 'IconLibrary'.", vbCritical
-        Exit Sub
-    End If
+    For attempt = 1 To maxAttempts
+        Application.CutCopyMode = False
+        DoEvents
 
-    ReDim shapesList(1 To n)
-    For i = 1 To n
-        Set shapesList(i) = ws.Shapes(i)
-    Next i
+        srcShp.Copy
 
-    Dim tempShp As Shape
-    For i = 1 To n - 1
-        For j = 1 To n - i
-            If shapesList(j).Left > shapesList(j + 1).Left Then
-                Set tempShp = shapesList(j)
-                Set shapesList(j) = shapesList(j + 1)
-                Set shapesList(j + 1) = tempShp
-            End If
-        Next j
-    Next i
+        ' Give the clipboard time to actually register the copy
+        Dim waitStart As Double
+        waitStart = Timer
+        Do While Timer < waitStart + 0.05
+            DoEvents
+        Loop
 
-    Dim iconNames As Variant
-    iconNames = Array("icon_building", "icon_bars", "icon_database", "icon_documentcheck", "icon_document", _
-        "icon_monitor", "icon_refresh", "icon_gear", "icon_grid", "icon_trash", _
-        "icon_export", "icon_people", "icon_wrench")
-
-    If n <> (UBound(iconNames) + 1) Then
-        MsgBox "Found " & n & " shapes but expected " & (UBound(iconNames) + 1) & ".", vbExclamation
-        Exit Sub
-    End If
-
-    For i = 1 To n
         On Error Resume Next
-        shapesList(i).Name = CStr(iconNames(i - 1))
+        Set newPic = Nothing
+        Set newPic = ws.Pictures.Paste(Link:=False)
         On Error GoTo 0
-    Next i
 
-    MsgBox "Icons named successfully.", vbInformation
-End Sub
+        ' Verify the paste actually succeeded with a real image
+        If Not newPic Is Nothing Then
+            If newPic.Width > 1 And newPic.Height > 1 Then
+                Exit For   ' Success - stop retrying
+            Else
+                On Error Resume Next
+                newPic.Delete
+                On Error GoTo 0
+                Set newPic = Nothing
+            End If
+        End If
+
+        DoEvents
+    Next attempt
+
+    Application.CutCopyMode = False
+
+    If newPic Is Nothing Then Exit Function
+
+    Set CopyLibraryPicture = ws.Shapes(newPic.Name)
+End Function
+
+
+
