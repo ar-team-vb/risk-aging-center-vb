@@ -8,12 +8,18 @@ Sub MainMenu()
     Dim frm As frmReportMenu
     Set frm = New frmReportMenu
 
+    frm.caption = "Villeroy & Boch AR Risk Tracker"
+    frm.lblTitle.caption = "Select an option:"
+    'frm.lblSubtitle.Caption = "Choose an action to run against the current workbook"
+
     frm.lstOptions.Clear
-    frm.lstOptions.AddItem "Generate Factoring Report (> 4,999 EUR)"
-    frm.lstOptions.AddItem "Generate Individual Company Code Tabs (> 4,999 EUR)"
+    frm.lstOptions.AddItem "Generate Factoring Report (over 4999 EUR)"
+    frm.lstOptions.AddItem "Generate Company Code Report per tab (over 1999 EUR)"
+    frm.lstOptions.AddItem "Generate Full Aging Report (all buckets, new tabs)"
+    frm.lstOptions.AddItem "Generate Single Report (pick one Company Code)"
+    frm.lstOptions.AddItem "Export a Generated Report to a New File"
+    frm.lstOptions.AddItem "Export ALL Generated Reports to a Folder"
     frm.lstOptions.AddItem "Reset Tracker (clears reports, history, CC tabs)"
-    frm.lstOptions.AddItem "Export a Single Report to a New File"
-    frm.lstOptions.AddItem "Export All Reports to a Folder"
 
     frm.Show
 
@@ -29,9 +35,11 @@ Sub MainMenu()
     Select Case sel
         Case 0: GenerateSummaryReport
         Case 1: GenerateCompanyCodeTabs
-        Case 2: ResetTracker
+        Case 2: GenerateFullAgingTabs
         Case 3: ExportGeneratedReport
-        Case 4: ExportAllGeneratedReports
+        Case 4: GenerateSingleReport
+        Case 5: ExportAllGeneratedReports
+        Case 6: ResetTracker
     End Select
 End Sub
 
@@ -62,7 +70,7 @@ Function IsProtectedSheet(sheetName As String) As Boolean
 End Function
 
 '============================================================
-' NORMALIZE CUSTOMER NUMBER - STRIPS LEADING ZEROS
+' NORMALIZE CUSTOMER NUMBER - STRIPS LEADING ZEROS FOR SAFE MATCHING
 '============================================================
 Function NormalizeCustNo(v As Variant) As String
     Dim s As String
@@ -76,6 +84,7 @@ End Function
 
 '============================================================
 ' SAFELY CONVERT A CELL VALUE TO DOUBLE - RETURNS 0 IF NOT NUMERIC
+' (Protects against BW's "MIX" mixed-currency markers, blanks, dashes, etc.)
 '============================================================
 Function SafeDouble(v As Variant) As Double
     If IsNumeric(v) And Trim(CStr(v)) <> "" Then
@@ -170,6 +179,7 @@ End Function
 
 '============================================================
 ' GET OR CREATE THE PERSISTENT FACTORING REPORT SHEET
+' (Named "Factoring Report", placed as the LAST tab)
 '============================================================
 Function GetOrCreateReportSheet() As Worksheet
     Dim ws As Worksheet
@@ -185,7 +195,7 @@ Function GetOrCreateReportSheet() As Worksheet
 End Function
 
 '============================================================
-' FIND WHERE THE NEXT WEEKLY BLOCK SHOULD START
+' FIND WHERE THE NEXT WEEKLY BLOCK SHOULD START (AT THE BOTTOM FIRST)
 '============================================================
 Function GetNextBlockStartRow(ws As Worksheet) As Long
     Dim lastUsed As Long
@@ -285,12 +295,12 @@ Sub GenerateSummaryReport()
     With wsRep
         .Range(.Cells(blockStart, "A"), .Cells(blockStart, "J")).Merge
         .Cells(blockStart, "A").Value = "WEEK " & weekNum & " - Report generated: " & Format(Now, "dd/mm/yyyy hh:nn")
-        .Cells(blockStart, "A").Font.Bold = True
+        .Cells(blockStart, "A").Font.bold = True
         .Cells(blockStart, "A").Font.Size = 12
         .Cells(blockStart, "A").Interior.Color = RGB(44, 62, 80)
         .Cells(blockStart, "A").Font.Color = RGB(236, 240, 241)
         .Cells(blockStart, "A").HorizontalAlignment = xlCenter
-        .Rows(blockStart).RowHeight = 22
+        .Rows(blockStart).rowHeight = 22
         .Rows(blockStart).Borders(xlEdgeTop).LineStyle = xlContinuous
         .Rows(blockStart).Borders(xlEdgeTop).Weight = xlThick
     End With
@@ -299,7 +309,7 @@ Sub GenerateSummaryReport()
     With wsRep
         .Range(.Cells(headerRow, "A"), .Cells(headerRow, "J")).Value = _
             Array("Company Code", "Customer", "Customer Name", "Overdue 60-89", "Overdue 90-179", "Overdue in Risk", "Total Overdue", "Status", "Factoring", "Atradius")
-        .Range(.Cells(headerRow, "A"), .Cells(headerRow, "J")).Font.Bold = True
+        .Range(.Cells(headerRow, "A"), .Cells(headerRow, "J")).Font.bold = True
         .Range(.Cells(headerRow, "A"), .Cells(headerRow, "J")).Interior.Color = RGB(68, 84, 106)
         .Range(.Cells(headerRow, "A"), .Cells(headerRow, "J")).Font.Color = RGB(255, 255, 255)
     End With
@@ -341,7 +351,7 @@ Sub GenerateSummaryReport()
                     .Cells(ccStartRow, "F").Value = ccTotalRisk
                     .Cells(ccStartRow, "G").Value = ccTotalAll
                     With .Range(.Cells(ccStartRow, "A"), .Cells(ccStartRow, "J"))
-                        .Font.Bold = True
+                        .Font.bold = True
                         .Font.Color = RGB(0, 0, 0)
                         .Interior.Color = RGB(213, 219, 226)
                         .Borders(xlEdgeTop).LineStyle = xlContinuous
@@ -351,7 +361,7 @@ Sub GenerateSummaryReport()
                         .Borders(xlEdgeBottom).Weight = xlMedium
                         .Borders(xlEdgeBottom).Color = RGB(52, 73, 94)
                     End With
-                    .Rows(ccStartRow).RowHeight = 18
+                    .Rows(ccStartRow).rowHeight = 18
                 End With
 
                 AddSleekEmailButton wsRep, ccStartRow, currentCC
@@ -397,14 +407,14 @@ Sub GenerateSummaryReport()
 
                 If factorSet.Exists(custNorm) Or factorSet.Exists(ccKey) Then
                     wsRep.Cells(r, "I").Value = "FACTOR"
-                    wsRep.Cells(r, "I").Font.Bold = True
+                    wsRep.Cells(r, "I").Font.bold = True
                     wsRep.Cells(r, "I").Font.Color = RGB(13, 71, 161)
                     wsRep.Cells(r, "I").HorizontalAlignment = xlCenter
                 End If
 
                 If atradiusSet.Exists(custNorm) Or atradiusSet.Exists(ccKey) Then
                     wsRep.Cells(r, "J").Value = "ATRADIUS"
-                    wsRep.Cells(r, "J").Font.Bold = True
+                    wsRep.Cells(r, "J").Font.bold = True
                     wsRep.Cells(r, "J").Font.Color = RGB(56, 142, 60)
                     wsRep.Cells(r, "J").HorizontalAlignment = xlCenter
                 End If
@@ -446,9 +456,9 @@ ContinueLoop:
     Dim k As Long
     For k = headerRow + 1 To lastDataRow
         If wsRep.Cells(k, "B").Value <> "" Then
-            wsRep.Range(wsRep.Cells(k, "A"), wsRep.Cells(k, "J")).Font.Bold = False
+            wsRep.Range(wsRep.Cells(k, "A"), wsRep.Cells(k, "J")).Font.bold = False
             If wsRep.Cells(k, "H").Value = "NEW" Then
-                wsRep.Cells(k, "H").Font.Bold = True
+                wsRep.Cells(k, "H").Font.bold = True
                 wsRep.Cells(k, "H").Font.Color = RGB(198, 40, 40)
             End If
         End If
@@ -462,11 +472,11 @@ ContinueLoop:
         wsRep.Rows("1:1").Insert Shift:=xlDown
     End If
 
+    AddExportButton wsRep
+
     Application.DisplayAlerts = False
     wsSrc.Delete
     Application.DisplayAlerts = True
-
-    EnsureTabOrder
 
     MsgBox totalCustomers & " factoring customers found exceeding threshold." & vbNewLine & _
            "Total risk exposure (60-179 Days): " & Format(totalExposure, "#,##0.00") & " EUR" & vbNewLine & _
@@ -478,11 +488,47 @@ CleanFail:
     On Error Resume Next
     If Not wsSrc Is Nothing Then wsSrc.Delete
     Application.DisplayAlerts = True
+    
+        Application.DisplayAlerts = False
+    wsSrc.Delete
+    Application.DisplayAlerts = True
+    
+    EnsureTabOrder
+    
     MsgBox "An error occurred while generating the report: " & Err.Description, vbCritical, "Process Error"
 End Sub
-
 '============================================================
-' OPTION 2 - DETAILED CC RISK TABS (> 4,999 EUR)
+' ENSURE FIXED TAB ORDER - Home always first, BW_Summary second
+' Also scrolls the tab strip back into view so Home is never hidden
+'============================================================
+Sub EnsureTabOrder()
+    Dim wsHome As Worksheet, wsBW As Worksheet
+
+    On Error Resume Next
+    Set wsHome = ThisWorkbook.Sheets("Home")
+    Set wsBW = ThisWorkbook.Sheets("BW_Summary")
+    On Error GoTo 0
+
+    If Not wsHome Is Nothing Then
+        wsHome.Visible = xlSheetVisible
+        wsHome.Move Before:=ThisWorkbook.Sheets(1)
+    End If
+
+    If Not wsBW Is Nothing Then
+        If Not wsHome Is Nothing Then
+            wsBW.Move After:=wsHome
+        Else
+            wsBW.Move Before:=ThisWorkbook.Sheets(1)
+        End If
+    End If
+
+    ' Scroll the visible tab strip back to the very start
+    On Error Resume Next
+    ActiveWindow.ScrollWorkbookTabs Position:=xlFirst
+    On Error GoTo 0
+End Sub
+'============================================================
+' OPTION 2 - DETAILED CC TABS EXPORT (> 4,999 EUR)
 '============================================================
 Sub GenerateCompanyCodeTabs()
     Dim wsSrcOriginal As Worksheet, wsSrc As Worksheet, wsNew As Worksheet
@@ -634,12 +680,12 @@ Sub GenerateCompanyCodeTabs()
             With wsNew
                 .Range("A1:J1").Merge
                 .Cells(1, "A").Value = "WEEK " & weekNum & " - " & cc & " Risk Sheet generated: " & Format(Now, "dd/mm/yyyy hh:nn")
-                .Cells(1, "A").Font.Bold = True
+                .Cells(1, "A").Font.bold = True
                 .Cells(1, "A").Font.Size = 12
                 .Cells(1, "A").Interior.Color = RGB(44, 62, 80)
                 .Cells(1, "A").Font.Color = RGB(236, 240, 241)
                 .Cells(1, "A").HorizontalAlignment = xlCenter
-                .Rows(1).RowHeight = 22
+                .Rows(1).rowHeight = 22
                 .Rows(1).Borders(xlEdgeTop).LineStyle = xlContinuous
                 .Rows(1).Borders(xlEdgeTop).Weight = xlThick
             End With
@@ -648,7 +694,7 @@ Sub GenerateCompanyCodeTabs()
 
             With wsNew
                 .Range("A5:J5").Value = Array("Company Code", "Customer", "Customer Name", "Overdue 60-89", "Overdue 90-179", "Overdue in Risk", "Total Overdue", "Status", "Factoring", "Atradius")
-                .Range("A5:J5").Font.Bold = True
+                .Range("A5:J5").Font.bold = True
                 .Range("A5:J5").Interior.Color = RGB(68, 84, 106)
                 .Range("A5:J5").Font.Color = RGB(255, 255, 255)
             End With
@@ -659,7 +705,7 @@ Sub GenerateCompanyCodeTabs()
                 .Cells(6, "F").Value = ccTotalRisk
                 .Cells(6, "G").Value = ccTotalAll
                 With .Range("A6:J6")
-                    .Font.Bold = True
+                    .Font.bold = True
                     .Font.Color = RGB(0, 0, 0)
                     .Interior.Color = RGB(213, 219, 226)
                     .Borders(xlEdgeTop).LineStyle = xlContinuous
@@ -669,7 +715,7 @@ Sub GenerateCompanyCodeTabs()
                     .Borders(xlEdgeBottom).Weight = xlMedium
                     .Borders(xlEdgeBottom).Color = RGB(52, 73, 94)
                 End With
-                .Rows(6).RowHeight = 18
+                .Rows(6).rowHeight = 18
             End With
 
             r = 7
@@ -712,14 +758,14 @@ Sub GenerateCompanyCodeTabs()
 
                         If factorSet.Exists(custNorm) Or factorSet.Exists(ccKey) Then
                             wsNew.Cells(r, 9).Value = "FACTOR"
-                            wsNew.Cells(r, 9).Font.Bold = True
+                            wsNew.Cells(r, 9).Font.bold = True
                             wsNew.Cells(r, 9).Font.Color = RGB(13, 71, 161)
                             wsNew.Cells(r, 9).HorizontalAlignment = xlCenter
                         End If
 
                         If atradiusSet.Exists(custNorm) Or atradiusSet.Exists(ccKey) Then
                             wsNew.Cells(r, 10).Value = "ATRADIUS"
-                            wsNew.Cells(r, 10).Font.Bold = True
+                            wsNew.Cells(r, 10).Font.bold = True
                             wsNew.Cells(r, 10).Font.Color = RGB(56, 142, 60)
                             wsNew.Cells(r, 10).HorizontalAlignment = xlCenter
                         End If
@@ -730,6 +776,7 @@ Sub GenerateCompanyCodeTabs()
 
             With wsNew
                 .Columns("A:J").AutoFit
+
                 .Range("D7:D" & (r - 1)).Interior.Color = RGB(255, 235, 156)
                 .Range("E7:E" & (r - 1)).Interior.Color = RGB(255, 199, 206)
                 .Range("F7:F" & (r - 1)).Interior.Color = RGB(224, 236, 255)
@@ -743,9 +790,9 @@ Sub GenerateCompanyCodeTabs()
 
                 Dim rowIdx As Long
                 For rowIdx = 7 To r - 1
-                    .Range(.Cells(rowIdx, "A"), .Cells(rowIdx, "J")).Font.Bold = False
+                    .Range(.Cells(rowIdx, "A"), .Cells(rowIdx, "J")).Font.bold = False
                     If .Cells(rowIdx, "H").Value = "NEW" Then
-                        .Cells(rowIdx, "H").Font.Bold = True
+                        .Cells(rowIdx, "H").Font.bold = True
                         .Cells(rowIdx, "H").Font.Color = RGB(198, 40, 40)
                     End If
                 Next rowIdx
@@ -761,12 +808,10 @@ Sub GenerateCompanyCodeTabs()
     wsSrc.Delete
     Application.DisplayAlerts = True
 
-    EnsureTabOrder
-
     If noRiskList <> "" Then
         noRiskList = Left(noRiskList, Len(noRiskList) - 2)
         MsgBox "Company Code Tabs generation complete!" & vbNewLine & vbNewLine & _
-               "The following Company Codes did not meet the " & Format(threshold, "#,##0") & " EUR threshold:" & vbNewLine & vbNewLine & _
+               "The following Company Codes did not meet the " & Format(threshold, "#,##0") & " EUR threshold, so no tabs were created:" & vbNewLine & vbNewLine & _
                noRiskList, vbInformation, "Process Complete"
     Else
         MsgBox "Detailed Company Code Tabs generated for all entities!", vbInformation, "Process Complete"
@@ -778,370 +823,10 @@ CleanFail:
     On Error Resume Next
     If Not wsSrc Is Nothing Then wsSrc.Delete
     Application.DisplayAlerts = True
+    
+    EnsureTabOrder
+    
     MsgBox "An error occurred while generating individual tabs: " & Err.Description, vbCritical, "Process Error"
-End Sub
-
-'============================================================
-' SHARED BUILDER - DRAWS FULL AGING CONTENT ONTO ANY GIVEN SHEET
-' (Used for direct-to-file generation; no tab left behind)
-'============================================================
-Sub BuildFullAgingContent(wsNew As Worksheet, wsSrc As Worksheet, cc As String, lastRow As Long)
-    Dim i As Long, r As Long
-    Dim mixCols As Variant, mc As Variant, foundMix As Boolean
-    mixCols = Array("G", "H", "I", "J", "K", "L", "M", "N", "O")
-
-    With wsNew
-        .Range("A1:L1").Merge
-        .Cells(1, "A").Value = "AGING REPORT - " & cc & " - Generated: " & Format(Now, "dd/mm/yyyy hh:nn")
-        .Cells(1, "A").Font.Bold = True
-        .Cells(1, "A").Font.Size = 12
-        .Cells(1, "A").Interior.Color = RGB(44, 62, 80)
-        .Cells(1, "A").Font.Color = RGB(236, 240, 241)
-        .Cells(1, "A").HorizontalAlignment = xlCenter
-        .Rows(1).RowHeight = 22
-        .Rows(1).Borders(xlEdgeTop).LineStyle = xlContinuous
-        .Rows(1).Borders(xlEdgeTop).Weight = xlThick
-    End With
-
-    With wsNew
-        .Range("A3:L3").Value = Array("Company Code", "Customer", "Customer Name", "Current", "Overdue 1-29", _
-            "Overdue 1-7", "Overdue 8-29", "Overdue 60-89", "Overdue 90-179", "Overdue 180-359", "Overdue >359", "Total Overdue")
-        .Range("A3:L3").Font.Bold = True
-        .Range("A3:L3").Interior.Color = RGB(68, 84, 106)
-        .Range("A3:L3").Font.Color = RGB(255, 255, 255)
-    End With
-
-    Dim sumCurrent As Double, sum129 As Double, sum17 As Double, sum829 As Double
-    Dim sum6089 As Double, sum90179 As Double, sum180359 As Double, sumOver359 As Double, sumTotal As Double
-    Dim ccCustCount As Long
-    sumCurrent = 0: sum129 = 0: sum17 = 0: sum829 = 0
-    sum6089 = 0: sum90179 = 0: sum180359 = 0: sumOver359 = 0: sumTotal = 0
-    ccCustCount = 0
-
-    For i = 4 To lastRow
-        If UCase(Trim(wsSrc.Cells(i, "A").Value)) = UCase(Trim(cc)) And wsSrc.Cells(i, "C").Value <> "Result" And Trim(wsSrc.Cells(i, "C").Value) <> "" Then
-            sumCurrent = sumCurrent + SafeDouble(wsSrc.Cells(i, "G").Value)
-            sum129 = sum129 + SafeDouble(wsSrc.Cells(i, "H").Value)
-            sum17 = sum17 + SafeDouble(wsSrc.Cells(i, "I").Value)
-            sum829 = sum829 + SafeDouble(wsSrc.Cells(i, "J").Value)
-            sum6089 = sum6089 + SafeDouble(wsSrc.Cells(i, "K").Value)
-            sum90179 = sum90179 + SafeDouble(wsSrc.Cells(i, "L").Value)
-            sum180359 = sum180359 + SafeDouble(wsSrc.Cells(i, "M").Value)
-            sumOver359 = sumOver359 + SafeDouble(wsSrc.Cells(i, "N").Value)
-            sumTotal = sumTotal + SafeDouble(wsSrc.Cells(i, "O").Value)
-            ccCustCount = ccCustCount + 1
-        End If
-    Next i
-
-    With wsNew
-        .Cells(4, "A").Value = cc
-        .Cells(4, "C").Value = ccCustCount & " customer(s)"
-        .Cells(4, "D").Value = sumCurrent
-        .Cells(4, "E").Value = sum129
-        .Cells(4, "F").Value = sum17
-        .Cells(4, "G").Value = sum829
-        .Cells(4, "H").Value = sum6089
-        .Cells(4, "I").Value = sum90179
-        .Cells(4, "J").Value = sum180359
-        .Cells(4, "K").Value = sumOver359
-        .Cells(4, "L").Value = sumTotal
-        With .Range("A4:L4")
-            .Font.Bold = True
-            .Font.Color = RGB(0, 0, 0)
-            .Interior.Color = RGB(213, 219, 226)
-            .Borders(xlEdgeTop).LineStyle = xlContinuous
-            .Borders(xlEdgeTop).Weight = xlThick
-            .Borders(xlEdgeTop).Color = RGB(52, 73, 94)
-            .Borders(xlEdgeBottom).LineStyle = xlContinuous
-            .Borders(xlEdgeBottom).Weight = xlMedium
-            .Borders(xlEdgeBottom).Color = RGB(52, 73, 94)
-        End With
-        .Rows(4).RowHeight = 18
-    End With
-
-    r = 5
-    For i = 4 To lastRow
-        If UCase(Trim(wsSrc.Cells(i, "A").Value)) = UCase(Trim(cc)) And wsSrc.Cells(i, "C").Value <> "Result" And Trim(wsSrc.Cells(i, "C").Value) <> "" Then
-            wsNew.Cells(r, 1).Value = cc
-            wsNew.Cells(r, 2).Value = wsSrc.Cells(i, "C").Value
-            wsNew.Cells(r, 3).Value = "     " & wsSrc.Cells(i, "D").Value
-
-            foundMix = False
-            For Each mc In mixCols
-                If IsMixedCurrency(wsSrc.Cells(i, CStr(mc)).Value) Then foundMix = True
-            Next mc
-            If foundMix Then
-                wsNew.Cells(r, 3).Value = wsNew.Cells(r, 3).Value & "  MIXED CURRENCY"
-                wsNew.Cells(r, 3).Font.Italic = True
-                wsNew.Cells(r, 3).Font.Color = RGB(230, 81, 0)
-            End If
-
-            wsNew.Cells(r, 4).Value = SafeDouble(wsSrc.Cells(i, "G").Value)
-            wsNew.Cells(r, 5).Value = SafeDouble(wsSrc.Cells(i, "H").Value)
-            wsNew.Cells(r, 6).Value = SafeDouble(wsSrc.Cells(i, "I").Value)
-            wsNew.Cells(r, 7).Value = SafeDouble(wsSrc.Cells(i, "J").Value)
-            wsNew.Cells(r, 8).Value = SafeDouble(wsSrc.Cells(i, "K").Value)
-            wsNew.Cells(r, 9).Value = SafeDouble(wsSrc.Cells(i, "L").Value)
-            wsNew.Cells(r, 10).Value = SafeDouble(wsSrc.Cells(i, "M").Value)
-            wsNew.Cells(r, 11).Value = SafeDouble(wsSrc.Cells(i, "N").Value)
-            wsNew.Cells(r, 12).Value = SafeDouble(wsSrc.Cells(i, "O").Value)
-            r = r + 1
-        End If
-    Next i
-
-    With wsNew
-        .Columns("A:L").AutoFit
-        If r - 1 >= 5 Then
-            .Range("D5:L" & (r - 1)).NumberFormat = "#,##0.00"
-            With .Range("A3:L" & (r - 1)).Borders
-                .LineStyle = xlContinuous
-                .Weight = xlThin
-                .Color = RGB(200, 200, 200)
-            End With
-            .Range("A3:L" & (r - 1)).BorderAround Weight:=xlMedium, Color:=RGB(52, 73, 94)
-
-            Dim rowIdx As Long
-            For rowIdx = 5 To r - 1
-                .Range(.Cells(rowIdx, "A"), .Cells(rowIdx, "L")).Font.Bold = False
-            Next rowIdx
-
-            .Outline.SummaryRow = xlAbove
-            .Rows("5:" & (r - 1)).Group
-        End If
-    End With
-End Sub
-
-'============================================================
-' FULL AGING REPORT - DIRECT TO FILES, NO TABS LEFT IN WORKBOOK
-'============================================================
-Sub GenerateFullAgingReportFiles()
-    Dim wsSrcOriginal As Worksheet, wsSrc As Worksheet
-    Dim lastRow As Long, i As Long
-    Dim uniqueCC As New Collection
-    Dim cc As Variant
-    Dim folderPath As String
-    Dim savedCount As Long
-
-    On Error GoTo CleanFail
-
-    On Error Resume Next
-    Set wsSrcOriginal = ThisWorkbook.Sheets("BW_Summary")
-    On Error GoTo 0
-    If wsSrcOriginal Is Nothing Then
-        MsgBox "Sheet 'BW_Summary' not found.", vbCritical
-        Exit Sub
-    End If
-
-    Dim fd As FileDialog
-    Set fd = Application.FileDialog(msoFileDialogFolderPicker)
-    fd.Title = "Select a folder to save the Full Aging Reports"
-    If fd.Show <> -1 Then Exit Sub
-    folderPath = fd.SelectedItems(1)
-    If Right(folderPath, 1) <> "\" Then folderPath = folderPath & "\"
-
-    Set wsSrc = CreateTempSourceCopy(wsSrcOriginal)
-
-    Dim lastRowA As Long, lastRowC As Long
-    lastRowA = wsSrc.Cells(wsSrc.Rows.Count, "A").End(xlUp).Row
-    lastRowC = wsSrc.Cells(wsSrc.Rows.Count, "C").End(xlUp).Row
-    lastRow = Application.WorksheetFunction.Max(lastRowA, lastRowC)
-
-    FillDownCompanyCode wsSrc, lastRow
-
-    On Error Resume Next
-    For i = 3 To lastRow
-        Dim ccName As String
-        ccName = UCase(Trim(wsSrc.Cells(i, "A").Value))
-        If ccName <> "" And ccName <> "RESULT" And ccName <> "COMPANY CODE" Then
-            uniqueCC.Add ccName, CStr(ccName)
-        End If
-    Next i
-    On Error GoTo 0
-
-    Dim tabDate As String
-    tabDate = Format(Date, "dd.mm.yyyy")
-    savedCount = 0
-
-    Application.ScreenUpdating = False
-
-    Dim frmProg As frmProgress
-    Set frmProg = New frmProgress
-    frmProg.Show vbModeless
-
-    Dim totalCC As Long, ccCounter As Long
-    totalCC = uniqueCC.Count
-    ccCounter = 0
-
-    For Each cc In uniqueCC
-        ccCounter = ccCounter + 1
-        frmProg.UpdateProgress ccCounter / totalCC, "Generating " & cc & " (" & ccCounter & " of " & totalCC & ")"
-        DoEvents
-
-        Dim newWB As Workbook
-        Dim wsNew As Worksheet
-
-        Set newWB = Workbooks.Add(xlWBATWorksheet)
-        Set wsNew = newWB.Sheets(1)
-        wsNew.Name = Left("F AGING_" & cc, 31)
-
-        BuildFullAgingContent wsNew, wsSrc, CStr(cc), lastRow
-
-        Dim fileName As String
-        fileName = "F AGING_" & cc & "_" & tabDate & ".xlsx"
-        fileName = Replace(fileName, "/", ".")
-        fileName = Replace(fileName, "\", ".")
-        fileName = Replace(fileName, ":", ".")
-
-        On Error Resume Next
-        Kill folderPath & fileName
-        On Error GoTo 0
-
-        frmProg.Hide
-        DoEvents
-
-        Dim fullSavePath As String
-        fullSavePath = folderPath & fileName
-
-        On Error Resume Next
-        newWB.SaveAs Filename:=fullSavePath, FileFormat:=51
-        On Error GoTo 0
-
-        newWB.Close SaveChanges:=False
-
-        frmProg.Show vbModeless
-        DoEvents
-
-        savedCount = savedCount + 1
-    Next cc
-
-    Unload frmProg
-    Application.ScreenUpdating = True
-
-    Application.DisplayAlerts = False
-    wsSrc.Delete
-    Application.DisplayAlerts = True
-
-    MsgBox savedCount & " Full Aging report(s) saved successfully to:" & vbNewLine & folderPath, vbInformation, "Full Aging Reports Complete"
-    Exit Sub
-
-CleanFail:
-    On Error Resume Next
-    Unload frmProg
-    On Error GoTo 0
-    Application.ScreenUpdating = True
-    Application.StatusBar = False
-    Application.DisplayAlerts = False
-    On Error Resume Next
-    If Not wsSrc Is Nothing Then wsSrc.Delete
-    Application.DisplayAlerts = True
-    MsgBox "An error occurred: " & Err.Description, vbCritical, "Process Error"
-End Sub
-
-'============================================================
-' SINGLE FULL AGING REPORT - DIRECT SAVE AS, NO TAB LEFT IN WORKBOOK
-'============================================================
-Sub GenerateSingleReportToFile()
-    Dim wsSrcOriginal As Worksheet, wsSrc As Worksheet
-    Dim lastRow As Long, i As Long
-    Dim uniqueCC As New Collection
-    Dim cc As Variant
-
-    On Error GoTo CleanFail
-
-    On Error Resume Next
-    Set wsSrcOriginal = ThisWorkbook.Sheets("BW_Summary")
-    On Error GoTo 0
-    If wsSrcOriginal Is Nothing Then
-        MsgBox "Sheet 'BW_Summary' not found.", vbCritical
-        Exit Sub
-    End If
-
-    Set wsSrc = CreateTempSourceCopy(wsSrcOriginal)
-
-    Dim lastRowA As Long, lastRowC As Long
-    lastRowA = wsSrc.Cells(wsSrc.Rows.Count, "A").End(xlUp).Row
-    lastRowC = wsSrc.Cells(wsSrc.Rows.Count, "C").End(xlUp).Row
-    lastRow = Application.WorksheetFunction.Max(lastRowA, lastRowC)
-
-    FillDownCompanyCode wsSrc, lastRow
-
-    On Error Resume Next
-    For i = 3 To lastRow
-        Dim ccName As String
-        ccName = UCase(Trim(wsSrc.Cells(i, "A").Value))
-        If ccName <> "" And ccName <> "RESULT" And ccName <> "COMPANY CODE" Then
-            uniqueCC.Add ccName, CStr(ccName)
-        End If
-    Next i
-    On Error GoTo 0
-
-    If uniqueCC.Count = 0 Then
-        Application.DisplayAlerts = False
-        wsSrc.Delete
-        Application.DisplayAlerts = True
-        MsgBox "No Company Codes found in BW_Summary.", vbExclamation
-        Exit Sub
-    End If
-
-    Dim frm As frmReportMenu
-    Set frm = New frmReportMenu
-    frm.lblTitle.Caption = "Select a Company Code:"
-
-    frm.lstOptions.Clear
-    For Each cc In uniqueCC
-        frm.lstOptions.AddItem cc
-    Next cc
-
-    frm.Show
-
-    If frm.UserCancelled Then
-        Unload frm
-        Application.DisplayAlerts = False
-        wsSrc.Delete
-        Application.DisplayAlerts = True
-        Exit Sub
-    End If
-
-    Dim selectedCC As String
-    selectedCC = frm.lstOptions.List(frm.SelectedIndex)
-    Unload frm
-
-    Dim newWB As Workbook
-    Dim wsNew As Worksheet
-    Set newWB = Workbooks.Add(xlWBATWorksheet)
-    Set wsNew = newWB.Sheets(1)
-    wsNew.Name = Left("F AGING_" & selectedCC, 31)
-
-    BuildFullAgingContent wsNew, wsSrc, selectedCC, lastRow
-
-    Application.DisplayAlerts = False
-    wsSrc.Delete
-    Application.DisplayAlerts = True
-
-    Dim defaultPath As String, defaultName As String
-    defaultPath = Environ("USERPROFILE") & "\Desktop\"
-    defaultName = defaultPath & "F AGING_" & selectedCC & "_" & Format(Date, "dd.mm.yyyy") & ".xlsx"
-
-    Dim savePath As Variant
-    savePath = Application.GetSaveAsFilename(InitialFileName:=defaultName, FileFilter:="Excel Workbook (*.xlsx), *.xlsx")
-
-    If savePath = False Then
-        newWB.Close SaveChanges:=False
-        Exit Sub
-    End If
-
-    newWB.SaveAs savePath
-    newWB.Close SaveChanges:=False
-
-    MsgBox "Report for " & selectedCC & " saved successfully.", vbInformation, "Report Complete"
-    Exit Sub
-
-CleanFail:
-    Application.DisplayAlerts = False
-    On Error Resume Next
-    If Not wsSrc Is Nothing Then wsSrc.Delete
-    Application.DisplayAlerts = True
-    MsgBox "An error occurred: " & Err.Description, vbCritical, "Process Error"
 End Sub
 
 '============================================================
@@ -1156,7 +841,7 @@ Sub BuildKPIDashboardAt(ws As Worksheet, topRow As Long, totalCustomers As Long,
         .Cells(r1, "A").Value = "Customers at Risk" & vbNewLine & totalCustomers
         .Cells(r1, "A").HorizontalAlignment = xlCenter
         .Cells(r1, "A").VerticalAlignment = xlCenter
-        .Cells(r1, "A").Font.Bold = True
+        .Cells(r1, "A").Font.bold = True
         .Cells(r1, "A").Font.Size = 14
         If totalCustomers > 10 Then
             .Range(.Cells(r1, "A"), .Cells(r2, "B")).Interior.Color = RGB(255, 205, 210)
@@ -1173,7 +858,7 @@ Sub BuildKPIDashboardAt(ws As Worksheet, topRow As Long, totalCustomers As Long,
         .Cells(r1, "C").Value = "Total Exposure EUR" & vbNewLine & Format(totalExposure, "#,##0.00")
         .Cells(r1, "C").HorizontalAlignment = xlCenter
         .Cells(r1, "C").VerticalAlignment = xlCenter
-        .Cells(r1, "C").Font.Bold = True
+        .Cells(r1, "C").Font.bold = True
         .Cells(r1, "C").Font.Size = 14
         If totalExposure > 100000 Then
             .Range(.Cells(r1, "C"), .Cells(r2, "D")).Interior.Color = RGB(255, 205, 210)
@@ -1190,7 +875,7 @@ Sub BuildKPIDashboardAt(ws As Worksheet, topRow As Long, totalCustomers As Long,
         .Cells(r1, "E").Value = "New Risks This Week" & vbNewLine & newThisWeek
         .Cells(r1, "E").HorizontalAlignment = xlCenter
         .Cells(r1, "E").VerticalAlignment = xlCenter
-        .Cells(r1, "E").Font.Bold = True
+        .Cells(r1, "E").Font.bold = True
         .Cells(r1, "E").Font.Size = 14
         If newThisWeek > 0 Then
             .Range(.Cells(r1, "E"), .Cells(r2, "F")).Interior.Color = RGB(255, 205, 210)
@@ -1201,7 +886,7 @@ Sub BuildKPIDashboardAt(ws As Worksheet, topRow As Long, totalCustomers As Long,
         End If
 
         .Range(.Cells(r1, "A"), .Cells(r2, "F")).Borders.Weight = xlThin
-        .Rows(r1 & ":" & r2).RowHeight = 20
+        .Rows(r1 & ":" & r2).rowHeight = 20
     End With
 End Sub
 
@@ -1260,7 +945,7 @@ Sub AddSleekEmailButton(ws As Worksheet, rowNum As Long, cc As String)
     btnWidth = 85
     btnHeight = 14
     btnLeft = btnRange.Left + (btnRange.Width - btnWidth) / 2
-    btnTop = btnRange.Top + (btnRange.RowHeight - btnHeight) / 2
+    btnTop = btnRange.Top + (btnRange.rowHeight - btnHeight) / 2
 
     Set shp = ws.Shapes.AddShape(msoShapeRoundedRectangle, btnLeft, btnTop, btnWidth, btnHeight)
     With shp
@@ -1274,7 +959,7 @@ Sub AddSleekEmailButton(ws As Worksheet, rowNum As Long, cc As String)
             .TextRange.Characters.Text = "Send Email " & cc
             .TextRange.Characters.Font.Name = "Calibri"
             .TextRange.Characters.Font.Size = 9
-            .TextRange.Characters.Font.Bold = True
+            .TextRange.Characters.Font.bold = True
             .TextRange.Characters.Font.Fill.ForeColor.RGB = RGB(255, 255, 255)
             .VerticalAnchor = msoAnchorMiddle
             .HorizontalAnchor = msoAnchorCenter
@@ -1284,6 +969,419 @@ Sub AddSleekEmailButton(ws As Worksheet, rowNum As Long, cc As String)
             .MarginBottom = 0
         End With
     End With
+End Sub
+
+'============================================================
+' ADD THE EXPORT BUTTONS (TOP OF FACTORING REPORT SHEET)
+'============================================================
+Sub AddExportButton(ws As Worksheet)
+    Dim shp As Shape
+    Dim btnName As String
+    btnName = "btnExportReport"
+
+    On Error Resume Next
+    ws.Shapes(btnName).Delete
+    On Error GoTo 0
+
+    Set shp = ws.Shapes.AddShape(msoShapeRoundedRectangle, ws.Range("M1").Left, ws.Range("M1").Top, 170, 22)
+    With shp
+        .Name = btnName
+        .OnAction = "ExportGeneratedReport"
+        .Fill.ForeColor.RGB = RGB(39, 92, 44)
+        .Line.ForeColor.RGB = RGB(24, 61, 27)
+        .Line.Weight = 1
+        With .TextFrame2
+            .TextRange.Characters.Text = "Export Report"
+            .TextRange.Characters.Font.Name = "Calibri"
+            .TextRange.Characters.Font.Size = 10
+            .TextRange.Characters.Font.bold = True
+            .TextRange.Characters.Font.Fill.ForeColor.RGB = RGB(255, 255, 255)
+            .VerticalAnchor = msoAnchorMiddle
+            .HorizontalAnchor = msoAnchorCenter
+        End With
+    End With
+
+    Dim btnName2 As String
+    btnName2 = "btnExportAllReports"
+
+    On Error Resume Next
+    ws.Shapes(btnName2).Delete
+    On Error GoTo 0
+
+    Dim shp2 As Shape
+    Set shp2 = ws.Shapes.AddShape(msoShapeRoundedRectangle, ws.Range("M1").Left, ws.Range("M1").Top + 26, 170, 22)
+    With shp2
+        .Name = btnName2
+        .OnAction = "ExportAllGeneratedReports"
+        .Fill.ForeColor.RGB = RGB(92, 64, 39)
+        .Line.ForeColor.RGB = RGB(61, 42, 24)
+        .Line.Weight = 1
+        With .TextFrame2
+            .TextRange.Characters.Text = "Export All Reports"
+            .TextRange.Characters.Font.Name = "Calibri"
+            .TextRange.Characters.Font.Size = 10
+            .TextRange.Characters.Font.bold = True
+            .TextRange.Characters.Font.Fill.ForeColor.RGB = RGB(255, 255, 255)
+            .VerticalAnchor = msoAnchorMiddle
+            .HorizontalAnchor = msoAnchorCenter
+        End With
+    End With
+End Sub
+
+'============================================================
+' EXTRACT A CLEAN DATE STRING FROM A "WEEK ..." BANNER TEXT
+'============================================================
+Function ExtractDateFromBanner(bannerText As String) As String
+    Dim pos As Long, rawDate As String
+    pos = InStr(bannerText, "generated:")
+    If pos > 0 Then
+        rawDate = Trim(Mid(bannerText, pos + Len("generated:")))
+        rawDate = Trim(Left(rawDate, 10))
+        rawDate = Replace(rawDate, "/", ".")
+    Else
+        rawDate = Format(Date, "dd.mm.yyyy")
+    End If
+    ExtractDateFromBanner = rawDate
+End Function
+
+'============================================================
+' OPTION 4 - EXPORT A SELECTED FACTORING BLOCK OR CC TAB
+'============================================================
+Sub ExportGeneratedReport()
+    Dim wsRep As Worksheet
+    Dim ws As Worksheet
+    Dim i As Long, lastRow As Long
+    Dim itemList As Collection, itemType As Collection, itemRef As Collection
+    Set itemList = New Collection
+    Set itemType = New Collection
+    Set itemRef = New Collection
+
+    On Error Resume Next
+    Set wsRep = ThisWorkbook.Sheets("Factoring Report")
+    On Error GoTo 0
+
+    Dim counter As Long
+    counter = 0
+
+    Dim bannerRows As Collection
+    Set bannerRows = New Collection
+
+    If Not wsRep Is Nothing Then
+        lastRow = wsRep.Cells(wsRep.Rows.Count, "A").End(xlUp).Row
+        For i = 1 To lastRow
+            If InStr(1, wsRep.Cells(i, "A").Value, "WEEK ") > 0 Then
+                bannerRows.Add i
+            End If
+        Next i
+
+        Dim bIdx As Long, bStart As Long, bEnd As Long
+        For bIdx = 1 To bannerRows.Count
+            counter = counter + 1
+            bStart = bannerRows(bIdx)
+            If bIdx < bannerRows.Count Then
+                bEnd = bannerRows(bIdx + 1) - 3
+            Else
+                bEnd = lastRow
+            End If
+            itemList.Add wsRep.Cells(bStart, "A").Value
+            itemType.Add "FACTORING"
+            itemRef.Add bStart & "|" & bEnd
+        Next bIdx
+    End If
+
+    For Each ws In ThisWorkbook.Sheets
+        If Not IsProtectedSheet(ws.Name) And ws.Name <> "Factoring Report" And ws.Name <> "RiskArchive" And ws.Name <> "AGING - " _
+           And ws.Name <> "TempBW_Working" And ws.Name <> "Home" And Left(ws.Name, 1) <> "_" And ws.Visible = xlSheetVisible Then
+            counter = counter + 1
+            itemList.Add ws.Name
+            itemType.Add "CCTAB"
+            itemRef.Add ws.Name
+        End If
+    Next ws
+
+    If counter = 0 Then
+        MsgBox "No generated reports found to export.", vbExclamation
+        Exit Sub
+    End If
+
+    Dim frm As frmReportMenu
+    Set frm = New frmReportMenu
+    frm.caption = "Export Generated Report"
+    frm.lblTitle.caption = "Select a report to export:"
+    'frm.lblSubtitle.Caption = "Pick a Factoring Report block or Company Code tab"
+
+    frm.lstOptions.Clear
+    Dim idx As Long
+    For idx = 1 To counter
+        frm.lstOptions.AddItem itemList(idx)
+    Next idx
+
+    frm.Show
+
+    If frm.UserCancelled Then
+        Unload frm
+        Exit Sub
+    End If
+
+    Dim selIdx As Long
+    selIdx = frm.SelectedIndex + 1
+    Unload frm
+
+    Dim selType As String, selRef As String
+    selType = itemType(selIdx)
+    selRef = itemRef(selIdx)
+
+    Dim newWB As Workbook
+    Dim exportFileName As String
+    Dim savePath As Variant
+
+    Application.ScreenUpdating = False
+
+    If selType = "FACTORING" Then
+        Dim parts() As String
+        parts = Split(selRef, "|")
+        Dim rStart As Long, rEnd As Long
+        rStart = CLng(parts(0))
+        rEnd = CLng(parts(1))
+
+        wsRep.Range("A" & rStart & ":K" & rEnd).Copy
+        Set newWB = Workbooks.Add(xlWBATWorksheet)
+        newWB.Sheets(1).Range("A1").PasteSpecial xlPasteColumnWidths
+        newWB.Sheets(1).Range("A1").PasteSpecial xlPasteAll
+        Application.CutCopyMode = False
+        newWB.Sheets(1).Name = "Factoring Report"
+
+        Dim datePart As String
+        datePart = ExtractDateFromBanner(wsRep.Cells(rStart, "A").Value)
+        exportFileName = "AGING - Factoring " & datePart
+    Else
+        Dim wsSel As Worksheet
+        Set wsSel = ThisWorkbook.Sheets(selRef)
+        wsSel.Cells.Copy
+        Set newWB = Workbooks.Add(xlWBATWorksheet)
+        newWB.Sheets(1).Range("A1").PasteSpecial xlPasteColumnWidths
+        newWB.Sheets(1).Range("A1").PasteSpecial xlPasteAll
+        Application.CutCopyMode = False
+
+        Dim ccPart As String, ccDatePart As String
+        If InStr(selRef, "_") > 0 Then
+            ccPart = Split(selRef, "_")(0)
+            ccDatePart = Split(selRef, "_")(1)
+        Else
+            ccPart = selRef
+            ccDatePart = Format(Date, "dd.mm.yyyy")
+        End If
+
+        newWB.Sheets(1).Name = Left(ccPart, 31)
+        exportFileName = "AGING - " & ccPart & " " & ccDatePart
+    End If
+
+    Application.ScreenUpdating = True
+
+    exportFileName = Replace(exportFileName, "/", ".")
+    exportFileName = Replace(exportFileName, "\", ".")
+    exportFileName = Replace(exportFileName, ":", ".")
+
+    savePath = Application.GetSaveAsFilename(InitialFileName:=exportFileName, FileFilter:="Excel Workbook (*.xlsx), *.xlsx")
+    If savePath = False Then
+        newWB.Close SaveChanges:=False
+        Exit Sub
+    End If
+
+    newWB.SaveAs savePath
+    MsgBox "Report exported successfully to:" & vbNewLine & savePath, vbInformation
+End Sub
+
+'============================================================
+' EXPORT ALL GENERATED REPORTS (FACTORING + ALL CC TABS) TO ONE FOLDER
+'============================================================
+Sub ExportAllGeneratedReports()
+    Dim wsRep As Worksheet, ws As Worksheet
+    Dim i As Long, lastRow As Long
+    Dim folderPath As String
+    Dim exportedCount As Long, failedCount As Long
+    Dim summaryMsg As String
+    
+    ' --- Check if there is anything to export before asking for a folder ---
+    If CountAvailableReports() = 0 Then
+        MsgBox "No generated reports found to export.", _
+               vbExclamation, "Nothing to Export"
+        Exit Sub
+    End If
+
+    Dim fd As FileDialog
+    Set fd = Application.FileDialog(msoFileDialogFolderPicker)
+    fd.Title = "Select a folder to export ALL generated reports"
+    If fd.Show <> -1 Then Exit Sub
+    folderPath = fd.SelectedItems(1)
+    If Right(folderPath, 1) <> "\" Then folderPath = folderPath & "\"
+
+    Application.ScreenUpdating = False
+    Application.DisplayAlerts = False
+
+    exportedCount = 0
+    failedCount = 0
+    summaryMsg = ""
+
+    On Error Resume Next
+    Set wsRep = ThisWorkbook.Sheets("Factoring Report")
+    On Error GoTo 0
+
+    If Not wsRep Is Nothing Then
+        lastRow = wsRep.Cells(wsRep.Rows.Count, "A").End(xlUp).Row
+        Dim bannerRows As Collection
+        Set bannerRows = New Collection
+        For i = 1 To lastRow
+            If InStr(1, wsRep.Cells(i, "A").Value, "WEEK ") > 0 Then
+                bannerRows.Add i
+            End If
+        Next i
+
+        Dim bIdx As Long, bStart As Long, bEnd As Long
+        For bIdx = 1 To bannerRows.Count
+            bStart = bannerRows(bIdx)
+            If bIdx < bannerRows.Count Then
+                bEnd = bannerRows(bIdx + 1) - 3
+            Else
+                bEnd = lastRow
+            End If
+
+            Dim datePart As String
+            datePart = ExtractDateFromBanner(wsRep.Cells(bStart, "A").Value)
+
+            Dim fName As String
+            fName = "AGING - Factoring " & datePart & ".xlsx"
+            fName = Replace(fName, "/", ".")
+            fName = Replace(fName, "\", ".")
+            fName = Replace(fName, ":", ".")
+
+            Dim newWB As Workbook
+            On Error Resume Next
+            Err.Clear
+            wsRep.Range("A" & bStart & ":K" & bEnd).Copy
+            Set newWB = Workbooks.Add(xlWBATWorksheet)
+            newWB.Sheets(1).Range("A1").PasteSpecial xlPasteColumnWidths
+            newWB.Sheets(1).Range("A1").PasteSpecial xlPasteAll
+            Application.CutCopyMode = False
+            newWB.Sheets(1).Name = "Factoring Report"
+            newWB.SaveAs folderPath & fName, FileFormat:=51
+            newWB.Close SaveChanges:=False
+
+           If Err.Number <> 0 Then
+    failedCount = failedCount + 1
+    summaryMsg = summaryMsg & "FAILED: " & fName & " -- Error " & Err.Number & ": " & Err.Description & vbNewLine
+    Err.Clear
+Else
+    exportedCount = exportedCount + 1
+End If
+            On Error GoTo 0
+        Next bIdx
+    End If
+
+    For Each ws In ThisWorkbook.Sheets
+        If Not IsProtectedSheet(ws.Name) And ws.Name <> "Factoring Report" And ws.Name <> "RiskArchive" And ws.Name <> "AGING - " _
+           And ws.Name <> "TempBW_Working" And Left(ws.Name, 1) <> "_" And ws.Visible = xlSheetVisible Then
+
+            Dim ccPart2 As String, ccDatePart2 As String
+            If InStr(ws.Name, "_") > 0 Then
+                ccPart2 = Split(ws.Name, "_")(0)
+                ccDatePart2 = Split(ws.Name, "_")(1)
+            Else
+                ccPart2 = ws.Name
+                ccDatePart2 = Format(Date, "dd.mm.yyyy")
+            End If
+
+            Dim fName2 As String
+            fName2 = "AGING - " & ccPart2 & " " & ccDatePart2 & ".xlsx"
+            fName2 = Replace(fName2, "/", ".")
+            fName2 = Replace(fName2, "\", ".")
+            fName2 = Replace(fName2, ":", ".")
+            
+            Dim lastR2 As Long
+            lastR2 = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+            If lastR2 < 1 Then lastR2 = 1
+
+
+            Dim newWB2 As Workbook
+            On Error Resume Next
+            Err.Clear
+            ws.Cells.Copy
+            Set newWB2 = Workbooks.Add(xlWBATWorksheet)
+            newWB2.Sheets(1).Range("A1").PasteSpecial xlPasteColumnWidths
+            newWB2.Sheets(1).Range("A1").PasteSpecial xlPasteAll
+            Application.CutCopyMode = False
+            newWB2.Sheets(1).Name = Left(ccPart2, 31)
+            newWB2.SaveAs folderPath & fName2, FileFormat:=51
+            newWB2.Close SaveChanges:=False
+
+            If Err.Number <> 0 Then
+    failedCount = failedCount + 1
+    summaryMsg = summaryMsg & "FAILED: " & fName2 & " -- Error " & Err.Number & ": " & Err.Description & vbNewLine
+    Err.Clear
+Else
+    exportedCount = exportedCount + 1
+End If
+On Error GoTo 0
+        End If
+    Next ws
+
+    Application.DisplayAlerts = True
+    Application.ScreenUpdating = True
+
+    MsgBox exportedCount & " report(s) exported successfully to:" & vbNewLine & folderPath & _
+           IIf(failedCount > 0, vbNewLine & vbNewLine & failedCount & " failed:" & vbNewLine & summaryMsg, ""), _
+           vbInformation, "Export All Reports Complete"
+
+    Dim frmClean As frmCleanupChoice
+    Set frmClean = New frmCleanupChoice
+    frmClean.Show
+
+    Dim cleanupResult As String
+    cleanupResult = frmClean.CleanupChoice
+    Unload frmClean
+
+    Select Case cleanupResult
+        Case "ALL"
+            DeleteGeneratedSheets True
+            MsgBox "All generated sheets have been deleted.", vbInformation
+        Case "NOFACTORING"
+            DeleteGeneratedSheets False
+            MsgBox "Company Code tabs deleted. Factoring Report was kept.", vbInformation
+        Case "NONE"
+            ' Keep everything - no action needed
+    End Select
+    
+    EnsureTabOrder
+    
+End Sub
+
+'============================================================
+' DELETE GENERATED SHEETS - USED AFTER EXPORT ALL
+' includeFactoring = True  -> also removes Factoring Report + RiskArchive
+' includeFactoring = False -> keeps Factoring Report + RiskArchive, deletes CC tabs only
+'============================================================
+Sub DeleteGeneratedSheets(includeFactoring As Boolean)
+    Dim ws As Worksheet
+    Dim sheetsToDelete As New Collection
+    Dim sName As Variant
+
+    For Each ws In ThisWorkbook.Sheets
+        If Not IsProtectedSheet(ws.Name) And Left(ws.Name, 1) <> "_" And ws.Name <> "TempBW_Working" Then
+            If ws.Name = "Factoring Report" Or ws.Name = "RiskArchive" Then
+                If includeFactoring Then sheetsToDelete.Add ws.Name
+            Else
+                sheetsToDelete.Add ws.Name
+            End If
+        End If
+    Next ws
+
+    Application.DisplayAlerts = False
+    For Each sName In sheetsToDelete
+        On Error Resume Next
+        ThisWorkbook.Sheets(CStr(sName)).Delete
+        On Error GoTo 0
+    Next sName
+    Application.DisplayAlerts = True
 End Sub
 
 '============================================================
@@ -1399,7 +1497,7 @@ Sub SendSingleEmailForCompanyCode()
     tempWS.Name = targetCC & "_Risk_Report"
 
     tempWS.Range("A1:G1").Value = Array("Company Code", "Customer", "Customer Name", "Overdue 60-89", "Overdue 90-179", "Overdue in Risk", "Status / Comments (Please fill up)")
-    tempWS.Range("A1:G1").Font.Bold = True
+    tempWS.Range("A1:G1").Font.bold = True
     tempWS.Range("A1:G1").Interior.Color = RGB(68, 84, 106)
     tempWS.Range("A1:G1").Font.Color = RGB(255, 255, 255)
 
@@ -1440,7 +1538,7 @@ Sub SendSingleEmailForCompanyCode()
 
     With OutMail
         .To = mailTo
-        If mailCc <> "" Then .CC = mailCc
+        If mailCc <> "" Then .cc = mailCc
         .Subject = targetCC & " - Customers in risk (Overdue 60-179)"
         .Attachments.Add tempFilePath
         .HTMLBody = "<font face='Calibri' size='3' color='#1F4E79'><p>Hi Team,</p>" & _
@@ -1461,160 +1559,367 @@ Sub SendSingleEmailForCompanyCode()
 End Sub
 
 '============================================================
-' EXTRACT A CLEAN DATE STRING FROM A "WEEK ..." BANNER TEXT
+' RESET TRACKER - WIPE HISTORY AND INDIVIDUAL TABS
 '============================================================
-Function ExtractDateFromBanner(bannerText As String) As String
-    Dim pos As Long, rawDate As String
-    pos = InStr(bannerText, "generated:")
-    If pos > 0 Then
-        rawDate = Trim(Mid(bannerText, pos + Len("generated:")))
-        rawDate = Trim(Left(rawDate, 10))
-        rawDate = Replace(rawDate, "/", ".")
-    Else
-        rawDate = Format(Date, "dd.mm.yyyy")
-    End If
-    ExtractDateFromBanner = rawDate
-End Function
+Sub ResetTracker()
+    Dim confirm As VbMsgBoxResult
+    confirm = MsgBox("This will permanently delete:" & vbNewLine & _
+                      "- The 'Factoring Report' sheet (all weekly blocks & KPIs)" & vbNewLine & _
+                      "- The 'RiskArchive' sheet (NEW/Existing history)" & vbNewLine & _
+                      "- All custom Company Code tabs (e.g., AMI_08.09.2026)" & vbNewLine & vbNewLine & _
+                      "Your master data sheets (BW_Summary, FactoringPartners, AtradiusPartners, Responsible) will stay untouched." & vbNewLine & vbNewLine & _
+                      "Continue?", vbYesNo + vbExclamation, "Reset Tracker Control")
 
-'============================================================
-' EXPORT A SELECTED FACTORING BLOCK OR CC TAB
-'============================================================
-Sub ExportGeneratedReport()
-    Dim wsRep As Worksheet
+    If confirm = vbNo Then Exit Sub
+
     Dim ws As Worksheet
-    Dim i As Long, lastRow As Long
-    Dim itemList As Collection, itemType As Collection, itemRef As Collection
-    Set itemList = New Collection
-    Set itemType = New Collection
-    Set itemRef = New Collection
-
-    On Error Resume Next
-    Set wsRep = ThisWorkbook.Sheets("Factoring Report")
-    On Error GoTo 0
-
-    Dim counter As Long
-    counter = 0
-
-    Dim bannerRows As Collection
-    Set bannerRows = New Collection
-
-    If Not wsRep Is Nothing Then
-        lastRow = wsRep.Cells(wsRep.Rows.Count, "A").End(xlUp).Row
-        For i = 1 To lastRow
-            If InStr(1, wsRep.Cells(i, "A").Value, "WEEK ") > 0 Then
-                bannerRows.Add i
-            End If
-        Next i
-
-        Dim bIdx As Long, bStart As Long, bEnd As Long
-        For bIdx = 1 To bannerRows.Count
-            counter = counter + 1
-            bStart = bannerRows(bIdx)
-            If bIdx < bannerRows.Count Then
-                bEnd = bannerRows(bIdx + 1) - 3
-            Else
-                bEnd = lastRow
-            End If
-            itemList.Add wsRep.Cells(bStart, "A").Value
-            itemType.Add "FACTORING"
-            itemRef.Add bStart & "|" & bEnd
-        Next bIdx
-    End If
+    Dim sheetsToDelete As New Collection
 
     For Each ws In ThisWorkbook.Sheets
-        If Not IsProtectedSheet(ws.Name) And ws.Name <> "Factoring Report" And ws.Name <> "RiskArchive" _
-           And ws.Name <> "TempBW_Working" And Left(ws.Name, 1) <> "_" And ws.Visible = xlSheetVisible Then
-            counter = counter + 1
-            itemList.Add ws.Name
-            itemType.Add "CCTAB"
-            itemRef.Add ws.Name
+        If Not IsProtectedSheet(ws.Name) Then
+            sheetsToDelete.Add ws.Name
         End If
     Next ws
 
-    If counter = 0 Then
-        MsgBox "No generated reports found to export. Please run Option 1 or Option 2 first.", vbExclamation
+    Application.DisplayAlerts = False
+    On Error Resume Next
+
+    ThisWorkbook.Sheets("BW_Summary").Visible = xlSheetVisible
+
+    Dim sName As Variant
+    For Each sName In sheetsToDelete
+        ThisWorkbook.Sheets(CStr(sName)).Delete
+    Next sName
+    On Error GoTo 0
+    Application.DisplayAlerts = True
+    
+    EnsureTabOrder
+
+    MsgBox "Tracker completely reset! All historic reports, archives, and custom tabs have been wiped clean.", vbInformation, "Reset Successful"
+End Sub
+
+'============================================================
+' GET OR CREATE THE FULL AGING REPORT SHEET (ALL BUCKETS, NO KPI)
+'============================================================
+Function GetOrCreateFullAgingSheet() As Worksheet
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Sheets("Full Aging Report")
+    On Error GoTo 0
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+        ws.Name = "Full Aging Report"
+        ws.Outline.SummaryRow = xlAbove
+    End If
+    Set GetOrCreateFullAgingSheet = ws
+End Function
+'============================================================
+' FULL AGING REPORT - ONE TAB PER COMPANY CODE, ALL BUCKETS, NO THRESHOLD, NO KPI
+'============================================================
+Sub GenerateFullAgingTabs()
+    Dim wsSrcOriginal As Worksheet, wsSrc As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim uniqueCC As New Collection
+    Dim cc As Variant
+    Dim createdCount As Long
+
+    On Error GoTo CleanFail
+
+    On Error Resume Next
+    Set wsSrcOriginal = ThisWorkbook.Sheets("BW_Summary")
+    On Error GoTo 0
+    If wsSrcOriginal Is Nothing Then
+        MsgBox "Sheet 'BW_Summary' not found.", vbCritical
         Exit Sub
     End If
 
+    Set wsSrc = CreateTempSourceCopy(wsSrcOriginal)
+
+    Dim lastRowA As Long, lastRowC As Long
+    lastRowA = wsSrc.Cells(wsSrc.Rows.Count, "A").End(xlUp).Row
+    lastRowC = wsSrc.Cells(wsSrc.Rows.Count, "C").End(xlUp).Row
+    lastRow = Application.WorksheetFunction.Max(lastRowA, lastRowC)
+
+    FillDownCompanyCode wsSrc, lastRow
+
+    ' --- Extract unique Company Codes ---
+    On Error Resume Next
+    For i = 3 To lastRow
+        Dim ccName As String
+        ccName = UCase(Trim(wsSrc.Cells(i, "A").Value))
+        If ccName <> "" And ccName <> "RESULT" And ccName <> "COMPANY CODE" Then
+            uniqueCC.Add ccName, CStr(ccName)
+        End If
+    Next i
+    On Error GoTo 0
+
+    createdCount = 0
+
+    For Each cc In uniqueCC
+        BuildFullAgingTabForCC wsSrc, CStr(cc), lastRow
+        createdCount = createdCount + 1
+    Next cc
+
+    Application.DisplayAlerts = False
+    wsSrc.Delete
+    Application.DisplayAlerts = True
+
+    EnsureTabOrder
+
+    MsgBox createdCount & " Full Aging tab(s) generated - one per Company Code.", vbInformation, "Full Aging Tabs Complete"
+    Exit Sub
+
+CleanFail:
+    Application.DisplayAlerts = False
+    On Error Resume Next
+    If Not wsSrc Is Nothing Then wsSrc.Delete
+    Application.DisplayAlerts = True
+    MsgBox "An error occurred while generating Full Aging tabs: " & Err.Description, vbCritical, "Process Error"
+End Sub
+
+'============================================================
+' SHARED BUILDER - CREATES ONE FULL AGING TAB FOR A SINGLE COMPANY CODE
+' Used by both GenerateFullAgingTabs (loop) and GenerateSingleReport (one CC)
+'============================================================
+Sub BuildFullAgingTabForCC(wsSrc As Worksheet, cc As String, lastRow As Long)
+    Dim wsNew As Worksheet
+    Dim i As Long, r As Long
+    Dim tabDate As String
+    Dim mixCols As Variant, mc As Variant, foundMix As Boolean
+    mixCols = Array("G", "H", "I", "J", "K", "L", "M", "N", "O")
+
+    tabDate = Format(Date, "dd.mm.yyyy")
+
+    Dim sheetName As String
+    sheetName = Left("F AGING_" & cc & "_" & tabDate, 31)
+
+    Application.DisplayAlerts = False
+    On Error Resume Next
+    ThisWorkbook.Sheets(sheetName).Delete
+    On Error GoTo 0
+    Application.DisplayAlerts = True
+
+    Set wsNew = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+    wsNew.Name = sheetName
+    wsNew.Outline.SummaryRow = xlAbove
+
+    ' --- Banner: name + date only, no KPI ---
+    With wsNew
+        .Range("A1:L1").Merge
+        .Cells(1, "A").Value = "AGING REPORT - " & cc & " - Generated: " & Format(Now, "dd/mm/yyyy hh:nn")
+        .Cells(1, "A").Font.bold = True
+        .Cells(1, "A").Font.Size = 12
+        .Cells(1, "A").Interior.Color = RGB(44, 62, 80)
+        .Cells(1, "A").Font.Color = RGB(236, 240, 241)
+        .Cells(1, "A").HorizontalAlignment = xlCenter
+        .Rows(1).rowHeight = 22
+        .Rows(1).Borders(xlEdgeTop).LineStyle = xlContinuous
+        .Rows(1).Borders(xlEdgeTop).Weight = xlThick
+    End With
+
+    ' --- Headers ---
+    With wsNew
+        .Range("A3:L3").Value = Array("Company Code", "Customer", "Customer Name", "Current", "Overdue 1-29", _
+            "Overdue 1-7", "Overdue 8-29", "Overdue 60-89", "Overdue 90-179", "Overdue 180-359", "Overdue >359", "Total Overdue")
+        .Range("A3:L3").Font.bold = True
+        .Range("A3:L3").Interior.Color = RGB(68, 84, 106)
+        .Range("A3:L3").Font.Color = RGB(255, 255, 255)
+    End With
+
+    ' --- Calculate subtotal for this CC ---
+    Dim sumCurrent As Double, sum129 As Double, sum17 As Double, sum829 As Double
+    Dim sum6089 As Double, sum90179 As Double, sum180359 As Double, sumOver359 As Double, sumTotal As Double
+    Dim ccCustCount As Long
+    sumCurrent = 0: sum129 = 0: sum17 = 0: sum829 = 0
+    sum6089 = 0: sum90179 = 0: sum180359 = 0: sumOver359 = 0: sumTotal = 0
+    ccCustCount = 0
+
+    For i = 4 To lastRow
+        If UCase(Trim(wsSrc.Cells(i, "A").Value)) = UCase(Trim(cc)) And wsSrc.Cells(i, "C").Value <> "Result" And Trim(wsSrc.Cells(i, "C").Value) <> "" Then
+            sumCurrent = sumCurrent + SafeDouble(wsSrc.Cells(i, "G").Value)
+            sum129 = sum129 + SafeDouble(wsSrc.Cells(i, "H").Value)
+            sum17 = sum17 + SafeDouble(wsSrc.Cells(i, "I").Value)
+            sum829 = sum829 + SafeDouble(wsSrc.Cells(i, "J").Value)
+            sum6089 = sum6089 + SafeDouble(wsSrc.Cells(i, "K").Value)
+            sum90179 = sum90179 + SafeDouble(wsSrc.Cells(i, "L").Value)
+            sum180359 = sum180359 + SafeDouble(wsSrc.Cells(i, "M").Value)
+            sumOver359 = sumOver359 + SafeDouble(wsSrc.Cells(i, "N").Value)
+            sumTotal = sumTotal + SafeDouble(wsSrc.Cells(i, "O").Value)
+            ccCustCount = ccCustCount + 1
+        End If
+    Next i
+
+    ' --- Row 4: Subtotal row ---
+    With wsNew
+        .Cells(4, "A").Value = cc
+        .Cells(4, "C").Value = ccCustCount & " customer(s)"
+        .Cells(4, "D").Value = sumCurrent
+        .Cells(4, "E").Value = sum129
+        .Cells(4, "F").Value = sum17
+        .Cells(4, "G").Value = sum829
+        .Cells(4, "H").Value = sum6089
+        .Cells(4, "I").Value = sum90179
+        .Cells(4, "J").Value = sum180359
+        .Cells(4, "K").Value = sumOver359
+        .Cells(4, "L").Value = sumTotal
+        With .Range("A4:L4")
+            .Font.bold = True
+            .Font.Color = RGB(0, 0, 0)
+            .Interior.Color = RGB(213, 219, 226)
+            .Borders(xlEdgeTop).LineStyle = xlContinuous
+            .Borders(xlEdgeTop).Weight = xlThick
+            .Borders(xlEdgeTop).Color = RGB(52, 73, 94)
+            .Borders(xlEdgeBottom).LineStyle = xlContinuous
+            .Borders(xlEdgeBottom).Weight = xlMedium
+            .Borders(xlEdgeBottom).Color = RGB(52, 73, 94)
+        End With
+        .Rows(4).rowHeight = 18
+    End With
+
+    ' --- Row 5+: Detail rows, no threshold, all customers ---
+    r = 5
+    For i = 4 To lastRow
+        If UCase(Trim(wsSrc.Cells(i, "A").Value)) = UCase(Trim(cc)) And wsSrc.Cells(i, "C").Value <> "Result" And Trim(wsSrc.Cells(i, "C").Value) <> "" Then
+            wsNew.Cells(r, 1).Value = cc
+            wsNew.Cells(r, 2).Value = wsSrc.Cells(i, "C").Value
+            wsNew.Cells(r, 3).Value = "     " & wsSrc.Cells(i, "D").Value
+
+            foundMix = False
+            For Each mc In mixCols
+                If IsMixedCurrency(wsSrc.Cells(i, CStr(mc)).Value) Then foundMix = True
+            Next mc
+            If foundMix Then
+                wsNew.Cells(r, 3).Value = wsNew.Cells(r, 3).Value & "  MIXED CURRENCY"
+                wsNew.Cells(r, 3).Font.Italic = True
+                wsNew.Cells(r, 3).Font.Color = RGB(230, 81, 0)
+            End If
+
+            wsNew.Cells(r, 4).Value = SafeDouble(wsSrc.Cells(i, "G").Value)
+            wsNew.Cells(r, 5).Value = SafeDouble(wsSrc.Cells(i, "H").Value)
+            wsNew.Cells(r, 6).Value = SafeDouble(wsSrc.Cells(i, "I").Value)
+            wsNew.Cells(r, 7).Value = SafeDouble(wsSrc.Cells(i, "J").Value)
+            wsNew.Cells(r, 8).Value = SafeDouble(wsSrc.Cells(i, "K").Value)
+            wsNew.Cells(r, 9).Value = SafeDouble(wsSrc.Cells(i, "L").Value)
+            wsNew.Cells(r, 10).Value = SafeDouble(wsSrc.Cells(i, "M").Value)
+            wsNew.Cells(r, 11).Value = SafeDouble(wsSrc.Cells(i, "N").Value)
+            wsNew.Cells(r, 12).Value = SafeDouble(wsSrc.Cells(i, "O").Value)
+            r = r + 1
+        End If
+    Next i
+
+    ' --- Formatting & outline grouping ---
+    With wsNew
+        .Columns("A:L").AutoFit
+        If r - 1 >= 5 Then
+            .Range("D4:L" & (r - 1)).NumberFormat = "#,##0.00"
+            With .Range("A3:L" & (r - 1)).Borders
+                .LineStyle = xlContinuous
+                .Weight = xlThin
+                .Color = RGB(200, 200, 200)
+            End With
+            .Range("A3:L" & (r - 1)).BorderAround Weight:=xlMedium, Color:=RGB(52, 73, 94)
+
+            Dim rowIdx As Long
+            For rowIdx = 5 To r - 1
+                .Range(.Cells(rowIdx, "A"), .Cells(rowIdx, "L")).Font.bold = False
+            Next rowIdx
+
+            .Rows("5:" & (r - 1)).Group
+        End If
+    End With
+End Sub
+'============================================================
+' GENERATE SINGLE REPORT - PICK ONE COMPANY CODE, FULL AGING STYLE
+'============================================================
+Sub GenerateSingleReport()
+    Dim wsSrcOriginal As Worksheet, wsSrc As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim uniqueCC As New Collection
+    Dim cc As Variant
+
+    On Error GoTo CleanFail
+
+    On Error Resume Next
+    Set wsSrcOriginal = ThisWorkbook.Sheets("BW_Summary")
+    On Error GoTo 0
+    If wsSrcOriginal Is Nothing Then
+        MsgBox "Sheet 'BW_Summary' not found.", vbCritical
+        Exit Sub
+    End If
+
+    Set wsSrc = CreateTempSourceCopy(wsSrcOriginal)
+
+    Dim lastRowA As Long, lastRowC As Long
+    lastRowA = wsSrc.Cells(wsSrc.Rows.Count, "A").End(xlUp).Row
+    lastRowC = wsSrc.Cells(wsSrc.Rows.Count, "C").End(xlUp).Row
+    lastRow = Application.WorksheetFunction.Max(lastRowA, lastRowC)
+
+    FillDownCompanyCode wsSrc, lastRow
+
+    ' --- Extract unique Company Codes ---
+    On Error Resume Next
+    For i = 3 To lastRow
+        Dim ccName As String
+        ccName = UCase(Trim(wsSrc.Cells(i, "A").Value))
+        If ccName <> "" And ccName <> "RESULT" And ccName <> "COMPANY CODE" Then
+            uniqueCC.Add ccName, CStr(ccName)
+        End If
+    Next i
+    On Error GoTo 0
+
+    If uniqueCC.Count = 0 Then
+        Application.DisplayAlerts = False
+        wsSrc.Delete
+        Application.DisplayAlerts = True
+        MsgBox "No Company Codes found in BW_Summary.", vbExclamation
+        Exit Sub
+    End If
+
+    ' --- Show selection form ---
     Dim frm As frmReportMenu
     Set frm = New frmReportMenu
-    frm.lblTitle.Caption = "Select a report to export:"
+    frm.lblTitle.caption = "Select a Company Code to generate the report:"
 
     frm.lstOptions.Clear
-    Dim idx As Long
-    For idx = 1 To counter
-        frm.lstOptions.AddItem itemList(idx)
-    Next idx
+    For Each cc In uniqueCC
+        frm.lstOptions.AddItem cc
+    Next cc
 
     frm.Show
 
     If frm.UserCancelled Then
         Unload frm
+        Application.DisplayAlerts = False
+        wsSrc.Delete
+        Application.DisplayAlerts = True
         Exit Sub
     End If
 
-    Dim selIdx As Long
-    selIdx = frm.SelectedIndex + 1
+    Dim selectedCC As String
+    selectedCC = frm.lstOptions.List(frm.SelectedIndex)
     Unload frm
 
-    Dim selType As String, selRef As String
-    selType = itemType(selIdx)
-    selRef = itemRef(selIdx)
+    ' --- Build the single tab using the shared builder ---
+    BuildFullAgingTabForCC wsSrc, selectedCC, lastRow
 
-    Dim newWB As Workbook
-    Dim exportFileName As String
-    Dim savePath As Variant
+    Application.DisplayAlerts = False
+    wsSrc.Delete
+    Application.DisplayAlerts = True
 
-    Application.ScreenUpdating = False
+    EnsureTabOrder
 
-    If selType = "FACTORING" Then
-        Dim parts() As String
-        parts = Split(selRef, "|")
-        Dim rStart As Long, rEnd As Long
-        rStart = CLng(parts(0))
-        rEnd = CLng(parts(1))
+    MsgBox "Single report generated for " & selectedCC & ".", vbInformation, "Report Complete"
+    Exit Sub
 
-        wsRep.Range("A" & rStart & ":K" & rEnd).Copy
-        Set newWB = Workbooks.Add(xlWBATWorksheet)
-        newWB.Sheets(1).Range("A1").PasteSpecial xlPasteColumnWidths
-        newWB.Sheets(1).Range("A1").PasteSpecial xlPasteAll
-        Application.CutCopyMode = False
-        newWB.Sheets(1).Name = "Factoring Report"
-
-        Dim datePart As String
-        datePart = ExtractDateFromBanner(wsRep.Cells(rStart, "A").Value)
-        exportFileName = "R AGING_FACTORING_" & datePart
-    Else
-        Dim wsSel As Worksheet
-        Set wsSel = ThisWorkbook.Sheets(selRef)
-        wsSel.Cells.Copy
-        Set newWB = Workbooks.Add(xlWBATWorksheet)
-        newWB.Sheets(1).Range("A1").PasteSpecial xlPasteColumnWidths
-        newWB.Sheets(1).Range("A1").PasteSpecial xlPasteAll
-        Application.CutCopyMode = False
-        newWB.Sheets(1).Name = Left(selRef, 31)
-
-        exportFileName = selRef
-    End If
-
-    Application.ScreenUpdating = True
-
-    exportFileName = Replace(exportFileName, "/", ".")
-    exportFileName = Replace(exportFileName, "\", ".")
-    exportFileName = Replace(exportFileName, ":", ".")
-
-    savePath = Application.GetSaveAsFilename(InitialFileName:=exportFileName, FileFilter:="Excel Workbook (*.xlsx), *.xlsx")
-    If savePath = False Then
-        newWB.Close SaveChanges:=False
-        Exit Sub
-    End If
-
-    newWB.SaveAs savePath
-    MsgBox "Report exported successfully to:" & vbNewLine & savePath, vbInformation
+CleanFail:
+    Application.DisplayAlerts = False
+    On Error Resume Next
+    If Not wsSrc Is Nothing Then wsSrc.Delete
+    Application.DisplayAlerts = True
+    MsgBox "An error occurred while generating the single report: " & Err.Description, vbCritical, "Process Error"
 End Sub
-
 '============================================================
-' EXPORT ALL GENERATED REPORTS TO ONE FOLDER
+' COUNT HOW MANY EXPORTABLE REPORTS CURRENTLY EXIST
 '============================================================
 Function CountAvailableReports() As Long
     Dim wsRep As Worksheet, ws As Worksheet
@@ -1645,177 +1950,6 @@ Function CountAvailableReports() As Long
     CountAvailableReports = total
 End Function
 
-Sub ExportAllGeneratedReports()
-    Dim wsRep As Worksheet, ws As Worksheet
-    Dim i As Long, lastRow As Long
-    Dim folderPath As String
-    Dim exportedCount As Long, failedCount As Long
-    Dim summaryMsg As String
-
-    If CountAvailableReports() = 0 Then
-        MsgBox "No available reports to export." & vbNewLine & vbNewLine & _
-               "Please generate a Factoring Report, Company Code Risk Tabs, or a Full Aging Report first.", _
-               vbExclamation, "Nothing to Export"
-        Exit Sub
-    End If
-
-    Dim fd As FileDialog
-    Set fd = Application.FileDialog(msoFileDialogFolderPicker)
-    fd.Title = "Select a folder to export ALL generated reports"
-    If fd.Show <> -1 Then Exit Sub
-    folderPath = fd.SelectedItems(1)
-    If Right(folderPath, 1) <> "\" Then folderPath = folderPath & "\"
-
-    Application.ScreenUpdating = False
-    Application.DisplayAlerts = False
-
-    exportedCount = 0
-    failedCount = 0
-    summaryMsg = ""
-
-    On Error Resume Next
-    Set wsRep = ThisWorkbook.Sheets("Factoring Report")
-    On Error GoTo 0
-
-    If Not wsRep Is Nothing Then
-        lastRow = wsRep.Cells(wsRep.Rows.Count, "A").End(xlUp).Row
-        Dim bannerRows As Collection
-        Set bannerRows = New Collection
-        For i = 1 To lastRow
-            If InStr(1, wsRep.Cells(i, "A").Value, "WEEK ") > 0 Then
-                bannerRows.Add i
-            End If
-        Next i
-
-        Dim bIdx As Long, bStart As Long, bEnd As Long
-        For bIdx = 1 To bannerRows.Count
-            bStart = bannerRows(bIdx)
-            If bIdx < bannerRows.Count Then
-                bEnd = bannerRows(bIdx + 1) - 3
-            Else
-                bEnd = lastRow
-            End If
-
-            Dim datePart As String
-            datePart = ExtractDateFromBanner(wsRep.Cells(bStart, "A").Value)
-
-            Dim fName As String
-            fName = "R AGING_FACTORING_" & datePart & ".xlsx"
-            fName = Replace(fName, "/", ".")
-            fName = Replace(fName, "\", ".")
-            fName = Replace(fName, ":", ".")
-
-            Dim newWB As Workbook
-            On Error Resume Next
-            Err.Clear
-            wsRep.Range("A" & bStart & ":K" & bEnd).Copy
-            Set newWB = Workbooks.Add(xlWBATWorksheet)
-            newWB.Sheets(1).Range("A1").PasteSpecial xlPasteColumnWidths
-            newWB.Sheets(1).Range("A1").PasteSpecial xlPasteAll
-            Application.CutCopyMode = False
-            newWB.Sheets(1).Name = "Factoring Report"
-            newWB.SaveAs folderPath & fName, FileFormat:=51
-            newWB.Close SaveChanges:=False
-
-            If Err.Number <> 0 Then
-                failedCount = failedCount + 1
-                summaryMsg = summaryMsg & "FAILED: " & fName & " -- Error " & Err.Number & ": " & Err.Description & vbNewLine
-                Err.Clear
-            Else
-                exportedCount = exportedCount + 1
-            End If
-            On Error GoTo 0
-        Next bIdx
-    End If
-
-    For Each ws In ThisWorkbook.Sheets
-        If Not IsProtectedSheet(ws.Name) And ws.Name <> "Factoring Report" And ws.Name <> "RiskArchive" _
-           And ws.Name <> "TempBW_Working" And Left(ws.Name, 1) <> "_" And ws.Visible = xlSheetVisible Then
-
-            Dim fName2 As String
-            fName2 = ws.Name & ".xlsx"
-            fName2 = Replace(fName2, "/", ".")
-            fName2 = Replace(fName2, "\", ".")
-            fName2 = Replace(fName2, ":", ".")
-
-            Dim newWB2 As Workbook
-            On Error Resume Next
-            Err.Clear
-            ws.Cells.Copy
-            Set newWB2 = Workbooks.Add(xlWBATWorksheet)
-            newWB2.Sheets(1).Range("A1").PasteSpecial xlPasteColumnWidths
-            newWB2.Sheets(1).Range("A1").PasteSpecial xlPasteAll
-            Application.CutCopyMode = False
-            newWB2.Sheets(1).Name = Left(ws.Name, 31)
-            newWB2.SaveAs folderPath & fName2, FileFormat:=51
-            newWB2.Close SaveChanges:=False
-
-            If Err.Number <> 0 Then
-                failedCount = failedCount + 1
-                summaryMsg = summaryMsg & "FAILED: " & fName2 & " -- Error " & Err.Number & ": " & Err.Description & vbNewLine
-                Err.Clear
-            Else
-                exportedCount = exportedCount + 1
-            End If
-            On Error GoTo 0
-        End If
-    Next ws
-
-    Application.DisplayAlerts = True
-    Application.ScreenUpdating = True
-
-    MsgBox exportedCount & " report(s) exported successfully to:" & vbNewLine & folderPath & _
-           IIf(failedCount > 0, vbNewLine & vbNewLine & failedCount & " failed:" & vbNewLine & summaryMsg, ""), _
-           vbInformation, "Export All Reports Complete"
-
-    Dim frmClean As frmCleanupChoice
-    Set frmClean = New frmCleanupChoice
-    frmClean.Show
-
-    Dim cleanupResult As String
-    cleanupResult = frmClean.CleanupChoice
-    Unload frmClean
-
-    Select Case cleanupResult
-        Case "ALL"
-            DeleteGeneratedSheets True
-            MsgBox "All generated sheets have been deleted.", vbInformation
-        Case "NOFACTORING"
-            DeleteGeneratedSheets False
-            MsgBox "Company Code tabs deleted. Factoring Report was kept.", vbInformation
-        Case "NONE"
-    End Select
-
-    EnsureTabOrder
-End Sub
-
-'============================================================
-' HELPER - DELETE GENERATED SHEETS (USED BY CLEANUP DIALOG)
-'============================================================
-Sub DeleteGeneratedSheets(includeFactoring As Boolean)
-    Dim ws As Worksheet
-    Dim sheetsToDelete As New Collection
-
-    For Each ws In ThisWorkbook.Sheets
-        If Not IsProtectedSheet(ws.Name) And ws.Name <> "TempBW_Working" And Left(ws.Name, 1) <> "_" Then
-            If includeFactoring Then
-                sheetsToDelete.Add ws.Name
-            ElseIf ws.Name <> "Factoring Report" And ws.Name <> "RiskArchive" Then
-                sheetsToDelete.Add ws.Name
-            End If
-        End If
-    Next ws
-
-    Application.DisplayAlerts = False
-    On Error Resume Next
-    Dim sName As Variant
-    For Each sName In sheetsToDelete
-        ThisWorkbook.Sheets(CStr(sName)).Delete
-    Next sName
-    On Error GoTo 0
-    Application.DisplayAlerts = True
-End Sub
-
 '============================================================
 ' DELETE ALL SHEETS EXCEPT FACTORING REPORT + MASTER DATA + HOME
 '============================================================
@@ -1825,7 +1959,7 @@ Sub DeleteAllSheetsExceptFactoring()
                       "- All Company Code Risk Tabs (R AGING_...)" & vbNewLine & _
                       "- All Full Aging / Single Report Tabs (F AGING_...)" & vbNewLine & vbNewLine & _
                       "The 'Factoring Report' sheet and its history will be KEPT." & vbNewLine & _
-                      "Master data sheets will stay untouched." & vbNewLine & vbNewLine & _
+                      "Master data sheets (BW_Summary, FactoringPartners, AtradiusPartners, Responsible) will stay untouched." & vbNewLine & vbNewLine & _
                       "Continue?", vbYesNo + vbExclamation, "Delete All Sheets (Except Factoring)")
 
     If confirm = vbNo Then Exit Sub
@@ -1863,80 +1997,479 @@ Sub DeleteAllSheetsExceptFactoring()
 End Sub
 
 '============================================================
-' RESET TRACKER - WIPE HISTORY AND INDIVIDUAL TABS
+' LOG IN TO SAP (IF NEEDED) AND OPEN PROMPTS FOR WORKBOOK
 '============================================================
-Sub ResetTracker()
-    Dim confirm As VbMsgBoxResult
-    confirm = MsgBox("This will permanently delete:" & vbNewLine & _
-                      "- The 'Factoring Report' sheet (all weekly blocks & KPIs)" & vbNewLine & _
-                      "- The 'RiskArchive' sheet (NEW/Existing history)" & vbNewLine & _
-                      "- All custom Company Code tabs" & vbNewLine & vbNewLine & _
-                      "Your master data sheets will stay untouched." & vbNewLine & vbNewLine & _
-                      "Continue?", vbYesNo + vbExclamation, "Reset Tracker Control")
+Sub OpenSAPPrompts()
+    Dim lResult As Variant
+    Dim errOccurred As Boolean
 
-    If confirm = vbNo Then Exit Sub
+    errOccurred = False
 
+    On Error Resume Next
+    ' Step 1: Initialize connection / trigger SAP logon window if disconnected
+    lResult = Application.Run("SAPExecuteCommand", "Refresh", "ALL")
+    If Err.Number <> 0 Then errOccurred = True
+
+    ' Step 2: Show Prompts for Workbook dialog
+    lResult = Application.Run("SAPExecuteCommand", "ShowPrompts", "ALL")
+    If Err.Number <> 0 Then errOccurred = True
+    On Error GoTo 0
+
+    ' Only show the warning if Excel genuinely failed to find/call the SAP Add-in
+    If errOccurred Then
+        MsgBox "Could not communicate with the SAP Analysis Add-In." & vbNewLine & vbNewLine & _
+               "Please check that:" & vbNewLine & _
+               "1. The 'Analysis' ribbon tab is enabled in Excel." & vbNewLine & _
+               "2. Your SAP network / VPN is connected.", _
+               vbExclamation, "SAP Analysis"
+    End If
+End Sub
+'============================================================
+' ONE-TIME SETUP - AUTO-NAME ICONS LEFT TO RIGHT (SINGLE ROW LAYOUT)
+'============================================================
+Sub NameIconLibraryShapesByPosition()
     Dim ws As Worksheet
-    Dim sheetsToDelete As New Collection
+    Dim shp As Shape
+    Dim shapesList() As Shape
+    Dim i As Long, j As Long, n As Long
 
-    For Each ws In ThisWorkbook.Sheets
-        If Not IsProtectedSheet(ws.Name) Then
-            sheetsToDelete.Add ws.Name
+    On Error Resume Next
+    Set ws = ThisWorkbook.Sheets("IconLibrary")
+    On Error GoTo 0
+    If ws Is Nothing Then
+        MsgBox "Sheet 'IconLibrary' not found.", vbCritical
+        Exit Sub
+    End If
+
+    n = ws.Shapes.Count
+    ReDim shapesList(1 To n)
+    For i = 1 To n
+        Set shapesList(i) = ws.Shapes(i)
+    Next i
+
+    ' Sort purely by Left position - single row layout
+    Dim tempShp As Shape
+    For i = 1 To n - 1
+        For j = 1 To n - i
+            If shapesList(j).Left > shapesList(j + 1).Left Then
+                Set tempShp = shapesList(j)
+                Set shapesList(j) = shapesList(j + 1)
+                Set shapesList(j + 1) = tempShp
+            End If
+        Next j
+    Next i
+
+    ' Names in exact left-to-right order from your screenshot
+    Dim iconNames As Variant
+iconNames = Array( _
+    "icon_building", "icon_bars", "icon_database", "icon_documentcheck", "icon_document", _
+    "icon_monitor", "icon_refresh", "icon_gear", "icon_grid", "icon_trash", _
+    "icon_export", "icon_people", "icon_wrench")
+
+    If n <> (UBound(iconNames) + 1) Then
+        MsgBox "Found " & n & " shapes but expected 13. Please check IconLibrary before continuing.", vbExclamation
+        Exit Sub
+    End If
+
+    Dim resultMsg As String
+    For i = 1 To n
+        On Error Resume Next
+        shapesList(i).Name = CStr(iconNames(i - 1))
+        On Error GoTo 0
+        resultMsg = resultMsg & i & ". " & iconNames(i - 1) & " -> Left:" & Round(shapesList(i).Left, 0) & vbNewLine
+    Next i
+
+    MsgBox "Icons named successfully!" & vbNewLine & vbNewLine & resultMsg, vbInformation, "Naming Complete"
+End Sub
+
+Sub HideIconLibrary()
+    ThisWorkbook.Sheets("IconLibrary").Visible = xlSheetVeryHidden
+End Sub
+
+'============================================================
+' SHARED BUILDER - DRAWS THE FULL AGING CONTENT ONTO ANY GIVEN SHEET
+' (Used for direct-to-file generation, no tab left behind)
+'============================================================
+Sub BuildFullAgingContent(wsNew As Worksheet, wsSrc As Worksheet, cc As String, lastRow As Long)
+    Dim i As Long, r As Long
+    Dim mixCols As Variant, mc As Variant, foundMix As Boolean
+    mixCols = Array("G", "H", "I", "J", "K", "L", "M", "N", "O")
+
+    With wsNew
+        .Range("A1:L1").Merge
+        .Cells(1, "A").Value = "AGING REPORT - " & cc & " - Generated: " & Format(Now, "dd/mm/yyyy hh:nn")
+        .Cells(1, "A").Font.bold = True
+        .Cells(1, "A").Font.Size = 12
+        .Cells(1, "A").Interior.Color = RGB(44, 62, 80)
+        .Cells(1, "A").Font.Color = RGB(236, 240, 241)
+        .Cells(1, "A").HorizontalAlignment = xlCenter
+        .Rows(1).rowHeight = 22
+        .Rows(1).Borders(xlEdgeTop).LineStyle = xlContinuous
+        .Rows(1).Borders(xlEdgeTop).Weight = xlThick
+    End With
+
+    With wsNew
+        .Range("A3:L3").Value = Array("Company Code", "Customer", "Customer Name", "Current", "Overdue 1-29", _
+            "Overdue 1-7", "Overdue 8-29", "Overdue 60-89", "Overdue 90-179", "Overdue 180-359", "Overdue >359", "Total Overdue")
+        .Range("A3:L3").Font.bold = True
+        .Range("A3:L3").Interior.Color = RGB(68, 84, 106)
+        .Range("A3:L3").Font.Color = RGB(255, 255, 255)
+    End With
+
+    Dim sumCurrent As Double, sum129 As Double, sum17 As Double, sum829 As Double
+    Dim sum6089 As Double, sum90179 As Double, sum180359 As Double, sumOver359 As Double, sumTotal As Double
+    Dim ccCustCount As Long
+    sumCurrent = 0: sum129 = 0: sum17 = 0: sum829 = 0
+    sum6089 = 0: sum90179 = 0: sum180359 = 0: sumOver359 = 0: sumTotal = 0
+    ccCustCount = 0
+
+    For i = 4 To lastRow
+        If UCase(Trim(wsSrc.Cells(i, "A").Value)) = UCase(Trim(cc)) And wsSrc.Cells(i, "C").Value <> "Result" And Trim(wsSrc.Cells(i, "C").Value) <> "" Then
+            sumCurrent = sumCurrent + SafeDouble(wsSrc.Cells(i, "G").Value)
+            sum129 = sum129 + SafeDouble(wsSrc.Cells(i, "H").Value)
+            sum17 = sum17 + SafeDouble(wsSrc.Cells(i, "I").Value)
+            sum829 = sum829 + SafeDouble(wsSrc.Cells(i, "J").Value)
+            sum6089 = sum6089 + SafeDouble(wsSrc.Cells(i, "K").Value)
+            sum90179 = sum90179 + SafeDouble(wsSrc.Cells(i, "L").Value)
+            sum180359 = sum180359 + SafeDouble(wsSrc.Cells(i, "M").Value)
+            sumOver359 = sumOver359 + SafeDouble(wsSrc.Cells(i, "N").Value)
+            sumTotal = sumTotal + SafeDouble(wsSrc.Cells(i, "O").Value)
+            ccCustCount = ccCustCount + 1
         End If
-    Next ws
+    Next i
+
+    With wsNew
+        .Cells(4, "A").Value = cc
+        .Cells(4, "C").Value = ccCustCount & " customer(s)"
+        .Cells(4, "D").Value = sumCurrent
+        .Cells(4, "E").Value = sum129
+        .Cells(4, "F").Value = sum17
+        .Cells(4, "G").Value = sum829
+        .Cells(4, "H").Value = sum6089
+        .Cells(4, "I").Value = sum90179
+        .Cells(4, "J").Value = sum180359
+        .Cells(4, "K").Value = sumOver359
+        .Cells(4, "L").Value = sumTotal
+        With .Range("A4:L4")
+            .Font.bold = True
+            .Font.Color = RGB(0, 0, 0)
+            .Interior.Color = RGB(213, 219, 226)
+            .Borders(xlEdgeTop).LineStyle = xlContinuous
+            .Borders(xlEdgeTop).Weight = xlThick
+            .Borders(xlEdgeTop).Color = RGB(52, 73, 94)
+            .Borders(xlEdgeBottom).LineStyle = xlContinuous
+            .Borders(xlEdgeBottom).Weight = xlMedium
+            .Borders(xlEdgeBottom).Color = RGB(52, 73, 94)
+        End With
+        .Rows(4).rowHeight = 18
+    End With
+
+    r = 5
+    For i = 4 To lastRow
+        If UCase(Trim(wsSrc.Cells(i, "A").Value)) = UCase(Trim(cc)) And wsSrc.Cells(i, "C").Value <> "Result" And Trim(wsSrc.Cells(i, "C").Value) <> "" Then
+            wsNew.Cells(r, 1).Value = cc
+            wsNew.Cells(r, 2).Value = wsSrc.Cells(i, "C").Value
+            wsNew.Cells(r, 3).Value = "     " & wsSrc.Cells(i, "D").Value
+
+            foundMix = False
+            For Each mc In mixCols
+                If IsMixedCurrency(wsSrc.Cells(i, CStr(mc)).Value) Then foundMix = True
+            Next mc
+            If foundMix Then
+                wsNew.Cells(r, 3).Value = wsNew.Cells(r, 3).Value & "  MIXED CURRENCY"
+                wsNew.Cells(r, 3).Font.Italic = True
+                wsNew.Cells(r, 3).Font.Color = RGB(230, 81, 0)
+            End If
+
+            wsNew.Cells(r, 4).Value = SafeDouble(wsSrc.Cells(i, "G").Value)
+            wsNew.Cells(r, 5).Value = SafeDouble(wsSrc.Cells(i, "H").Value)
+            wsNew.Cells(r, 6).Value = SafeDouble(wsSrc.Cells(i, "I").Value)
+            wsNew.Cells(r, 7).Value = SafeDouble(wsSrc.Cells(i, "J").Value)
+            wsNew.Cells(r, 8).Value = SafeDouble(wsSrc.Cells(i, "K").Value)
+            wsNew.Cells(r, 9).Value = SafeDouble(wsSrc.Cells(i, "L").Value)
+            wsNew.Cells(r, 10).Value = SafeDouble(wsSrc.Cells(i, "M").Value)
+            wsNew.Cells(r, 11).Value = SafeDouble(wsSrc.Cells(i, "N").Value)
+            wsNew.Cells(r, 12).Value = SafeDouble(wsSrc.Cells(i, "O").Value)
+            r = r + 1
+        End If
+    Next i
+
+    With wsNew
+        .Columns("A:L").AutoFit
+        If r - 1 >= 5 Then
+            .Range("D5:L" & (r - 1)).NumberFormat = "#,##0.00"
+            With .Range("A3:L" & (r - 1)).Borders
+                .LineStyle = xlContinuous
+                .Weight = xlThin
+                .Color = RGB(200, 200, 200)
+            End With
+            .Range("A3:L" & (r - 1)).BorderAround Weight:=xlMedium, Color:=RGB(52, 73, 94)
+
+            Dim rowIdx As Long
+            For rowIdx = 5 To r - 1
+                .Range(.Cells(rowIdx, "A"), .Cells(rowIdx, "L")).Font.bold = False
+            Next rowIdx
+
+            .Outline.SummaryRow = xlAbove
+            .Rows("5:" & (r - 1)).Group
+        End If
+    End With
+End Sub
+'============================================================
+' FULL AGING REPORT - DIRECT TO FILES, NO TABS LEFT IN WORKBOOK
+'============================================================
+Sub GenerateFullAgingReportFiles()
+    Dim wsSrcOriginal As Worksheet, wsSrc As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim uniqueCC As New Collection
+    Dim cc As Variant
+    Dim folderPath As String
+    Dim savedCount As Long
+
+    On Error GoTo CleanFail
+
+    On Error Resume Next
+    Set wsSrcOriginal = ThisWorkbook.Sheets("BW_Summary")
+    On Error GoTo 0
+    If wsSrcOriginal Is Nothing Then
+        MsgBox "Sheet 'BW_Summary' not found.", vbCritical
+        Exit Sub
+    End If
+
+    Dim fd As FileDialog
+    Set fd = Application.FileDialog(msoFileDialogFolderPicker)
+    fd.Title = "Select a folder to save the Full Aging Reports"
+    If fd.Show <> -1 Then Exit Sub
+    folderPath = fd.SelectedItems(1)
+    If Right(folderPath, 1) <> "\" Then folderPath = folderPath & "\"
+
+    Set wsSrc = CreateTempSourceCopy(wsSrcOriginal)
+
+    Dim lastRowA As Long, lastRowC As Long
+    lastRowA = wsSrc.Cells(wsSrc.Rows.Count, "A").End(xlUp).Row
+    lastRowC = wsSrc.Cells(wsSrc.Rows.Count, "C").End(xlUp).Row
+    lastRow = Application.WorksheetFunction.Max(lastRowA, lastRowC)
+
+    FillDownCompanyCode wsSrc, lastRow
+
+    On Error Resume Next
+    For i = 3 To lastRow
+        Dim ccName As String
+        ccName = UCase(Trim(wsSrc.Cells(i, "A").Value))
+        If ccName <> "" And ccName <> "RESULT" And ccName <> "COMPANY CODE" Then
+            uniqueCC.Add ccName, CStr(ccName)
+        End If
+    Next i
+    On Error GoTo 0
+
+    Dim tabDate As String
+    tabDate = Format(Date, "dd.mm.yyyy")
+    savedCount = 0
+
+    Application.ScreenUpdating = False
+
+    ' --- Progress form ---
+    Dim frmProg As frmProgress
+    Set frmProg = New frmProgress
+    frmProg.Show vbModeless
+
+    Dim totalCC As Long, ccCounter As Long
+    totalCC = uniqueCC.Count
+    ccCounter = 0
+
+    For Each cc In uniqueCC
+        ccCounter = ccCounter + 1
+        frmProg.UpdateProgress ccCounter / totalCC, "Generating " & cc & " (" & ccCounter & " of " & totalCC & ")"
+        DoEvents
+
+        Dim newWB As Workbook
+        Dim wsNew As Worksheet
+
+        Set newWB = Workbooks.Add(xlWBATWorksheet)
+        Set wsNew = newWB.Sheets(1)
+        wsNew.Name = Left("F AGING_" & cc, 31)
+
+        BuildFullAgingContent wsNew, wsSrc, CStr(cc), lastRow
+
+        Dim fileName As String
+        fileName = "F AGING_" & cc & "_" & tabDate & ".xlsx"
+        fileName = Replace(fileName, "/", ".")
+        fileName = Replace(fileName, "\", ".")
+        fileName = Replace(fileName, ":", ".")
+
+        On Error Resume Next
+        Kill folderPath & fileName
+        On Error GoTo 0
+
+        frmProg.Hide
+        DoEvents
+
+        Dim fullSavePath As String
+        fullSavePath = folderPath & fileName
+
+        Dim saveAttempt As Long, saveSuccess As Boolean
+        saveSuccess = False
+
+        For saveAttempt = 1 To 5
+            On Error Resume Next
+            Err.Clear
+            newWB.SaveAs fileName:=fullSavePath, FileFormat:=51
+            If Err.Number = 0 Then
+                saveSuccess = True
+                On Error GoTo 0
+                Exit For
+            End If
+            On Error GoTo 0
+
+            ' Wait briefly before retrying - gives OneDrive time to release the lock
+            Dim waitStart As Double
+            waitStart = Timer
+            Do While Timer < waitStart + 0.5
+                DoEvents
+            Loop
+        Next saveAttempt
+
+        If Not saveSuccess Then
+            MsgBox "Could not save file for " & cc & " after 5 attempts." & vbNewLine & _
+                   "Path: " & fullSavePath & vbNewLine & _
+                   "This folder may be a OneDrive-synced location that is temporarily locked.", vbExclamation
+        End If
+
+        newWB.Close SaveChanges:=False
+
+        frmProg.Show vbModeless
+        DoEvents
+
+        savedCount = savedCount + 1
+    Next cc
+
+    Unload frmProg
+    Application.ScreenUpdating = True
 
     Application.DisplayAlerts = False
-    On Error Resume Next
-
-    ThisWorkbook.Sheets("BW_Summary").Visible = xlSheetVisible
-
-    Dim sName As Variant
-    For Each sName In sheetsToDelete
-        ThisWorkbook.Sheets(CStr(sName)).Delete
-    Next sName
-    On Error GoTo 0
+    wsSrc.Delete
     Application.DisplayAlerts = True
 
-    MsgBox "Tracker completely reset! All historic reports, archives, and custom tabs have been wiped clean.", vbInformation, "Reset Successful"
+    MsgBox savedCount & " Full Aging report(s) saved successfully to:" & vbNewLine & folderPath, vbInformation, "Full Aging Reports Complete"
+    Exit Sub
+
+CleanFail:
+    On Error Resume Next
+    Unload frmProg
+    On Error GoTo 0
+    Application.ScreenUpdating = True
+    Application.StatusBar = False
+    Application.DisplayAlerts = False
+    On Error Resume Next
+    If Not wsSrc Is Nothing Then wsSrc.Delete
+    Application.DisplayAlerts = True
+    MsgBox "An error occurred: " & Err.Description, vbCritical, "Process Error"
 End Sub
 
 '============================================================
-' ENSURE FIXED TAB ORDER - Home always first, BW_Summary second
+' SINGLE FULL AGING REPORT - DIRECT SAVE AS, NO TAB LEFT IN WORKBOOK
 '============================================================
-Sub EnsureTabOrder()
-    Dim wsHome As Worksheet, wsBW As Worksheet
+Sub GenerateSingleReportToFile()
+    Dim wsSrcOriginal As Worksheet, wsSrc As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim uniqueCC As New Collection
+    Dim cc As Variant
+
+    On Error GoTo CleanFail
 
     On Error Resume Next
-    Set wsHome = ThisWorkbook.Sheets("Home")
-    Set wsBW = ThisWorkbook.Sheets("BW_Summary")
+    Set wsSrcOriginal = ThisWorkbook.Sheets("BW_Summary")
     On Error GoTo 0
-
-    If Not wsHome Is Nothing Then
-        wsHome.Visible = xlSheetVisible
-        wsHome.Move Before:=ThisWorkbook.Sheets(1)
+    If wsSrcOriginal Is Nothing Then
+        MsgBox "Sheet 'BW_Summary' not found.", vbCritical
+        Exit Sub
     End If
 
-    If Not wsBW Is Nothing Then
-        If Not wsHome Is Nothing Then
-            wsBW.Move After:=wsHome
-        Else
-            wsBW.Move Before:=ThisWorkbook.Sheets(1)
+    Set wsSrc = CreateTempSourceCopy(wsSrcOriginal)
+
+    Dim lastRowA As Long, lastRowC As Long
+    lastRowA = wsSrc.Cells(wsSrc.Rows.Count, "A").End(xlUp).Row
+    lastRowC = wsSrc.Cells(wsSrc.Rows.Count, "C").End(xlUp).Row
+    lastRow = Application.WorksheetFunction.Max(lastRowA, lastRowC)
+
+    FillDownCompanyCode wsSrc, lastRow
+
+    On Error Resume Next
+    For i = 3 To lastRow
+        Dim ccName As String
+        ccName = UCase(Trim(wsSrc.Cells(i, "A").Value))
+        If ccName <> "" And ccName <> "RESULT" And ccName <> "COMPANY CODE" Then
+            uniqueCC.Add ccName, CStr(ccName)
         End If
+    Next i
+    On Error GoTo 0
+
+    If uniqueCC.Count = 0 Then
+        Application.DisplayAlerts = False
+        wsSrc.Delete
+        Application.DisplayAlerts = True
+        MsgBox "No Company Codes found in BW_Summary.", vbExclamation
+        Exit Sub
     End If
 
+    Dim frm As frmReportMenu
+    Set frm = New frmReportMenu
+    frm.lblTitle.caption = "Select a Company Code:"
+
+    frm.lstOptions.Clear
+    For Each cc In uniqueCC
+        frm.lstOptions.AddItem cc
+    Next cc
+
+    frm.Show
+
+    If frm.UserCancelled Then
+        Unload frm
+        Application.DisplayAlerts = False
+        wsSrc.Delete
+        Application.DisplayAlerts = True
+        Exit Sub
+    End If
+
+    Dim selectedCC As String
+    selectedCC = frm.lstOptions.List(frm.SelectedIndex)
+    Unload frm
+
+    Dim newWB As Workbook
+    Dim wsNew As Worksheet
+    Set newWB = Workbooks.Add(xlWBATWorksheet)
+    Set wsNew = newWB.Sheets(1)
+    wsNew.Name = Left("F AGING_" & selectedCC, 31)
+
+    BuildFullAgingContent wsNew, wsSrc, selectedCC, lastRow
+
+    Application.DisplayAlerts = False
+    wsSrc.Delete
+    Application.DisplayAlerts = True
+
+Dim defaultName As String
+Dim defaultPath As String
+defaultPath = Environ("USERPROFILE") & "\Desktop\"
+defaultName = defaultPath & "F AGING_" & selectedCC & "_" & Format(Date, "dd.mm.yyyy") & ".xlsx"
+
+Dim savePath As Variant
+savePath = Application.GetSaveAsFilename(InitialFileName:=defaultName, FileFilter:="Excel Workbook (*.xlsx), *.xlsx")
+
+    If savePath = False Then
+        newWB.Close SaveChanges:=False
+        Exit Sub
+    End If
+
+    newWB.SaveAs savePath
+    newWB.Close SaveChanges:=False
+
+    MsgBox "Report for " & selectedCC & " saved successfully.", vbInformation, "Report Complete"
+    Exit Sub
+
+CleanFail:
+    Application.DisplayAlerts = False
     On Error Resume Next
-    ActiveWindow.ScrollWorkbookTabs Position:=xlFirst
-    On Error GoTo 0
+    If Not wsSrc Is Nothing Then wsSrc.Delete
+    Application.DisplayAlerts = True
+    MsgBox "An error occurred: " & Err.Description, vbCritical, "Process Error"
 End Sub
-
-'============================================================
-' JUMP BACK TO HOME
-'============================================================
-Sub GoToHome()
-    On Error Resume Next
-    ThisWorkbook.Sheets("Home").Activate
-    ActiveWindow.ScrollWorkbookTabs Position:=xlFirst
-    On Error GoTo 0
-End Sub
-
-
