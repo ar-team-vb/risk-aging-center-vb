@@ -2201,7 +2201,7 @@ Sub BuildFullAgingContent(wsNew As Worksheet, wsSrc As Worksheet, cc As String, 
     With wsNew
         .Columns("A:L").AutoFit
         If r - 1 >= 5 Then
-            .Range("D5:L" & (r - 1)).NumberFormat = "#,##0.00"
+            .Range("D4:L" & (r - 1)).NumberFormat = "#,##0.00"
             With .Range("A3:L" & (r - 1)).Borders
                 .LineStyle = xlContinuous
                 .Weight = xlThin
